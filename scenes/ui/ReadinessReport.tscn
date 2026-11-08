@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[node name="ReadinessReport" type="AcceptDialog"]
+title = "Flight Readiness Review"
+size = Vector2i(700, 600)
+
+[node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Checks" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3

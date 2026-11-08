@@ -25,6 +25,12 @@ var _yaw := 0.6
 var _distance := 5.0
 var _dragging := false
 var _dimensions := Vector3.ONE
+var _stats_helper = preload("res://scripts/BuildStats.gd").new()
+var _telemetry: VBoxContainer
+var _launch: Button
+var _notice: Label
+var stats: Dictionary = {}
+var review: Array[Dictionary] = []
 
 func _ready() -> void:
 	mission = GameManager.current_mission if not GameManager.current_mission.is_empty() else GlobalData.get_mission(1)
@@ -37,6 +43,8 @@ func _ready() -> void:
 	_make_world()
 	_refresh_parts()
 	_refresh_build()
+	build_changed.connect(_update_readiness)
+	_update_readiness()
 	GameManager.campaign_changed.connect(_refresh_parts)
 
 func _make_ui() -> void:
@@ -59,11 +67,11 @@ func _make_ui() -> void:
 	reset.text = "Reset view"
 	reset.pressed.connect(_reset_camera)
 	header.add_child(reset)
-	var launch := Button.new()
-	launch.text = "Launch"
-	launch.disabled = true
-	launch.tooltip_text = "Flight readiness review is coming soon."
-	header.add_child(launch)
+	_launch = Button.new()
+	_launch.text = "Launch"
+	_launch.disabled = true
+	_launch.pressed.connect(_launch_build)
+	header.add_child(_launch)
 	var columns := HBoxContainer.new()
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outer.add_child(columns)
@@ -92,14 +100,18 @@ func _make_ui() -> void:
 	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_viewport_container.add_child(viewport)
+	var right_scroll := ScrollContainer.new()
+	right_scroll.custom_minimum_size.x = 350
+	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	columns.add_child(right_scroll)
 	var right := VBoxContainer.new()
-	right.custom_minimum_size.x = 350
-	columns.add_child(right)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.add_child(right)
 	var installed_label := Label.new()
 	installed_label.text = "INSTALLED PARTS"
 	right.add_child(installed_label)
 	var installed_scroll := ScrollContainer.new()
-	installed_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	installed_scroll.custom_minimum_size.y = 160
 	installed_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	right.add_child(installed_scroll)
 	_installed_container = VBoxContainer.new()
@@ -129,6 +141,15 @@ func _make_ui() -> void:
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_message.add_theme_color_override("font_color", Color("ffb300"))
 	_fuel_box.add_child(_message)
+	_notice = Label.new()
+	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right.add_child(_notice)
+	var review_button := Button.new()
+	review_button.text = "Run Readiness Review"
+	review_button.pressed.connect(_show_review)
+	right.add_child(review_button)
+	_telemetry = VBoxContainer.new()
+	right.add_child(_telemetry)
 
 func _make_world() -> void:
 	var viewport: SubViewport = _viewport_container.get_child(0)
@@ -397,3 +418,74 @@ func _reset_camera() -> void:
 func _back() -> void:
 	var path := "res://scenes/MissionSelect.tscn"
 	get_tree().change_scene_to_file(path if ResourceLoader.exists(path) else "res://scenes/MainMenu.tscn")
+
+func _build_data() -> Dictionary:
+	return {"launcher": launcher, "bus": bus, "installed_components": installed_components, "propellant_mass_kg": propellant_mass_kg}
+
+func _update_readiness() -> void:
+	var build := _build_data()
+	stats = _stats_helper.calculate_stats(build, mission)
+	review = _stats_helper.run_readiness_review(build, mission)
+	_launch.disabled = _has_failures()
+	_notice.text = ""
+	for child in _telemetry.get_children():
+		child.queue_free()
+	var endurance := "No load" if is_inf(stats.endurance_minutes) else "%.1f min" % stats.endurance_minutes
+	_add_telemetry("Mass", "%.2f / %.2f kg (%.1f%% margin)" % [stats.wet_mass_kg, stats.launcher_capacity_kg, stats.mass_margin_pct], stats.wet_mass_kg, stats.launcher_capacity_kg * 0.9, "Mass budget")
+	_add_telemetry("Volume", "%.2f / %.2f L" % [stats.internal_volume_liters, stats.volume_capacity_liters], stats.internal_volume_liters, stats.volume_capacity_liters, "Volume")
+	_add_telemetry("Power", "+%.1f / -%.1f W (net %.1f W)" % [stats.generation_w, stats.draw_w, stats.net_power_w], stats.draw_w, stats.generation_w, "Daylight power")
+	_add_telemetry("Battery", "%.1f Wh; %s / %.1f min eclipse" % [stats.battery_wh, endurance, stats.eclipse_minutes], stats.eclipse_minutes, stats.endurance_minutes, "Eclipse endurance")
+	_add_telemetry("Delta-v", "%.1f / %.1f m/s" % [stats.delta_v_mps, stats.delta_v_target_mps], stats.delta_v_target_mps, stats.delta_v_mps, "Delta-v")
+	_add_telemetry("Cost", "$%.2fM / $%.2fM" % [stats.cost_millions, stats.budget_millions], stats.cost_millions, stats.budget_millions, "Budget")
+
+func _add_telemetry(title: String, text: String, used: float, limit: float, check_name: String) -> void:
+	var status := "PASS"
+	for item in review:
+		if item.check == check_name: status = item.status
+	var color := Color("ff4d4d") if status == "FAIL" else (Color("ffb300") if status == "ADVISORY" or (is_finite(limit) and limit > 0.0 and used >= limit * 0.9) else Color("55d785"))
+	var label := Label.new()
+	label.text = title + ": " + text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", color)
+	_telemetry.add_child(label)
+	var bar := ProgressBar.new()
+	bar.max_value = 100
+	bar.value = clampf(used / limit * 100.0, 0.0, 100.0) if is_finite(limit) and limit > 0 else 0.0
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 8
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = color
+	bar.add_theme_stylebox_override("fill", fill)
+	_telemetry.add_child(bar)
+
+func _has_failures() -> bool:
+	for item in review:
+		if item.status == "FAIL": return true
+	return false
+
+func _show_review() -> void:
+	var dialog: AcceptDialog = load("res://scenes/ui/ReadinessReport.tscn").instantiate()
+	add_child(dialog)
+	var container: VBoxContainer = dialog.get_node("Scroll/Checks")
+	for item in review:
+		var label := Label.new()
+		label.text = "%s — %s: %s" % [item.status, item.check, item.message]
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size.x = 600
+		label.add_theme_color_override("font_color", Color("ff4d4d") if item.status == "FAIL" else (Color("ffb300") if item.status == "ADVISORY" else Color("55d785")))
+		container.add_child(label)
+	dialog.close_requested.connect(dialog.queue_free)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.popup_centered(Vector2i(700, 600))
+
+func _launch_build() -> void:
+	_update_readiness()
+	if _has_failures(): return
+	var build := _build_data().duplicate(true)
+	build["stats"] = stats.duplicate(true)
+	GameManager.current_build = build
+	if ResourceLoader.exists("res://scenes/Launch.tscn"):
+		GameManager.state = GameManager.State.LAUNCH
+		get_tree().change_scene_to_file("res://scenes/Launch.tscn")
+	else:
+		_notice.text = "Build ready. Launch sequence coming soon."

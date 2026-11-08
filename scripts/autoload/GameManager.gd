@@ -11,6 +11,7 @@ var unlocked_part_ids: Array[String] = []
 var owned_tech_nodes: Array[String] = []
 var completed_missions: Array[int] = []
 var current_mission: Dictionary = {}
+var current_build: Dictionary = {}
 var unlocked_tier: int = 0
 var last_result: Dictionary = {}
 var last_receipt: Dictionary = {}
@@ -33,6 +34,7 @@ func new_campaign() -> Error:
 	owned_tech_nodes.clear()
 	completed_missions.clear()
 	current_mission = {}
+	current_build = {}
 	last_result = {}
 	last_receipt = {}
 	attempt_id = ""
@@ -96,6 +98,7 @@ func load_campaign() -> Error:
 		completed_missions.append(int(item))
 	last_receipt = data.last_receipt
 	current_mission = {}
+	current_build = {}
 	last_result = {}
 	attempt_id = ""
 	attempt_is_replay = false
@@ -116,6 +119,7 @@ func start_mission(number: int) -> bool:
 	if not is_mission_unlocked(number):
 		return false
 	current_mission = GlobalData.get_mission(number)
+	current_build = {}
 	attempt_id = Crypto.new().generate_random_bytes(16).hex_encode()
 	attempt_is_replay = number in completed_missions
 	last_result = {}

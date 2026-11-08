@@ -69,3 +69,11 @@ Run the assembly checks with `godot --headless --path . --script res://tests/tes
 New Campaign initializes and saves a new agency; Continue restores `user://save.json`. Mission Select opens the Workshop, and later flight scenes can provide `GameManager.last_result` and enter `scenes/Debrief.tscn` for scoring and settlement. A running mission must be started with `GameManager.start_mission(number)` so the debrief has its attempt identity. Reopening the same debrief does not pay twice. Failed saves can be retried.
 
 Run campaign tests with `godot --headless --path . --script res://tests/test_campaign.gd`. The deliberately corrupt-save case prints a JSON parse error. The campaign, Workshop, FlightSim, and data suites pass on Godot 4.7.2. An isolated Web fixture verified a successful debrief, Mission 2 unlock, saved balances after reload, Workshop navigation, and debug controls; F9 was also checked in a release export. Native visual interaction remains unverified.
+
+## Readiness review
+
+Workshop telemetry updates as parts and propellant change. Run Readiness Review to see individual failures and advisories; Launch requires no failures. Until the launch scene is available, Launch saves an independent build snapshot and shows a confirmation in the Workshop.
+
+Run checks with `godot --headless --path . --script res://tests/test_readiness.gd`. The readiness, Workshop, campaign, FlightSim, and data tests pass on Godot 4.7.2. An isolated Web preview was checked for the report, Mission 1 assembly, live updates, and launch handoff. Native visual interaction and browser resize/scroll checks remain unverified.
+
+`GameManager.current_build` holds `launcher`, `bus`, `installed_components`, `propellant_mass_kg`, and `stats`; stats include power, battery, mass, volume, delta-v, cost, and landing TWR. Mission 7 landing mass uses the 2,600 m/s pre-landing handoff from SPA-23.
