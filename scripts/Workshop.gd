@@ -37,6 +37,7 @@ func _ready() -> void:
 	_make_world()
 	_refresh_parts()
 	_refresh_build()
+	GameManager.campaign_changed.connect(_refresh_parts)
 
 func _make_ui() -> void:
 	var outer := VBoxContainer.new()
@@ -229,6 +230,7 @@ func _refresh_parts() -> void:
 			button.pressed.connect(add_part.bind(part.id))
 			entries.add_child(button)
 			if part.get("thrustNewtons", 0.0) > 0.0:
+				button.disabled = not _engine().is_empty()
 				_engine_buttons.append(button)
 
 func _engine() -> Dictionary:

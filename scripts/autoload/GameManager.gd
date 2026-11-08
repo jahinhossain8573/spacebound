@@ -1,5 +1,7 @@
 extends Node
 
+signal campaign_changed
+
 enum State { MAIN_MENU, MISSION_SELECT, WORKSHOP, LAUNCH, FLIGHT_OPS, DEBRIEF, TECH_TREE }
 
 var state: State = State.MAIN_MENU
@@ -9,3 +11,235 @@ var unlocked_part_ids: Array[String] = []
 var owned_tech_nodes: Array[String] = []
 var completed_missions: Array[int] = []
 var current_mission: Dictionary = {}
+var unlocked_tier: int = 0
+var last_result: Dictionary = {}
+var last_receipt: Dictionary = {}
+var attempt_id: String = ""
+var attempt_is_replay: bool = false
+var save_path := "user://save.json"
+var debug_disable_reliability := false
+var debug_unlock_missions := false
+var _debug_panel: Control
+
+func _ready() -> void:
+	if OS.is_debug_build():
+		_create_debug_panel()
+
+func new_campaign() -> Error:
+	funds_millions = 0.0
+	science_points = 0
+	unlocked_tier = 0
+	unlocked_part_ids.clear()
+	owned_tech_nodes.clear()
+	completed_missions.clear()
+	current_mission = {}
+	last_result = {}
+	last_receipt = {}
+	attempt_id = ""
+	attempt_is_replay = false
+	debug_disable_reliability = false
+	debug_unlock_missions = false
+	for catalog in [GlobalData.launchers, GlobalData.buses, GlobalData.components]:
+		for item in catalog:
+			if item.tier == 0:
+				unlocked_part_ids.append(item.id)
+	campaign_changed.emit()
+	return save_campaign()
+
+func save_campaign() -> Error:
+	var data := {"version": 1, "funds_millions": funds_millions, "science_points": science_points, "unlocked_part_ids": unlocked_part_ids, "owned_tech_nodes": owned_tech_nodes, "completed_missions": completed_missions, "unlocked_tier": unlocked_tier, "last_receipt": last_receipt}
+	var temp := save_path + ".tmp"
+	var file := FileAccess.open(temp, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	file.store_string(JSON.stringify(data))
+	file.flush()
+	var error := file.get_error()
+	file.close()
+	if error != OK:
+		return error
+	return DirAccess.rename_absolute(ProjectSettings.globalize_path(temp), ProjectSettings.globalize_path(save_path))
+
+func load_campaign() -> Error:
+	if not FileAccess.file_exists(save_path):
+		return ERR_FILE_NOT_FOUND
+	var file := FileAccess.open(save_path, FileAccess.READ)
+	if file == null:
+		return FileAccess.get_open_error()
+	var data: Variant = JSON.parse_string(file.get_as_text())
+	if not data is Dictionary or data.get("version") != 1:
+		return ERR_FILE_CORRUPT
+	for key in ["funds_millions", "science_points", "unlocked_tier"]:
+		if not (data.get(key) is int or data.get(key) is float) or data[key] < 0:
+			return ERR_FILE_CORRUPT
+	if data.unlocked_tier > 4 or data.science_points != floor(data.science_points) or data.unlocked_tier != floor(data.unlocked_tier):
+		return ERR_FILE_CORRUPT
+	for key in ["unlocked_part_ids", "owned_tech_nodes", "completed_missions"]:
+		if not data.get(key) is Array:
+			return ERR_FILE_CORRUPT
+	for key in ["unlocked_part_ids", "owned_tech_nodes"]:
+		for item in data[key]:
+			if not item is String:
+				return ERR_FILE_CORRUPT
+	for item in data.completed_missions:
+		if not (item is int or item is float) or item != floor(item) or GlobalData.get_mission(int(item)).is_empty():
+			return ERR_FILE_CORRUPT
+	if not data.get("last_receipt") is Dictionary:
+		return ERR_FILE_CORRUPT
+	funds_millions = data.funds_millions
+	science_points = int(data.science_points)
+	unlocked_tier = int(data.unlocked_tier)
+	unlocked_part_ids.assign(data.unlocked_part_ids)
+	owned_tech_nodes.assign(data.owned_tech_nodes)
+	completed_missions.clear()
+	for item in data.completed_missions:
+		completed_missions.append(int(item))
+	last_receipt = data.last_receipt
+	current_mission = {}
+	last_result = {}
+	attempt_id = ""
+	attempt_is_replay = false
+	campaign_changed.emit()
+	return OK
+
+func is_mission_unlocked(number: int) -> bool:
+	if OS.is_debug_build() and debug_unlock_missions:
+		return not GlobalData.get_mission(number).is_empty()
+	var previous := -1
+	for mission in GlobalData.missions:
+		if int(mission.missionNumber) == number:
+			return previous == -1 or previous in completed_missions
+		previous = int(mission.missionNumber)
+	return false
+
+func start_mission(number: int) -> bool:
+	if not is_mission_unlocked(number):
+		return false
+	current_mission = GlobalData.get_mission(number)
+	attempt_id = Crypto.new().generate_random_bytes(16).hex_encode()
+	attempt_is_replay = number in completed_missions
+	last_result = {}
+	state = State.WORKSHOP
+	return true
+
+func compute_score(result: Dictionary) -> Dictionary:
+	var mission := GlobalData.get_mission(int(result.get("mission_number", 0)))
+	if mission.is_empty():
+		return {}
+	var objectives: Array = result.get("objectives", [])
+	var completed := 0
+	if result.get("launched", true):
+		for objective in objectives:
+			if objective is Dictionary and objective.get("done", false) == true:
+				completed += 1
+	var total := objectives.size()
+	var fraction := float(completed) / total if total > 0 else 0.0
+	var primary := 60.0 * fraction
+	var bonus := 0
+	var budget: float = mission.budgetCapMillions
+	if result.has("total_cost_m") and result.total_cost_m <= budget:
+		bonus += 1
+	if result.has("mass_margin_pct") and result.mass_margin_pct >= 20.0:
+		bonus += 1
+	if result.has("battery_lowest_pct") and result.battery_lowest_pct >= 30.0:
+		bonus += 1
+	if (result.has("dv_reserve_pct") and result.dv_reserve_pct >= 10.0) or "E18" in result.get("events_fired", []):
+		bonus += 1
+	var efficiency := 0.0
+	if result.has("total_cost_m") and budget > 0:
+		efficiency = 10.0 * clampf((budget - float(result.total_cost_m)) / (budget * 0.3), 0.0, 1.0)
+	var margin := 0.0
+	if result.has("mass_margin_pct"):
+		if result.mass_margin_pct >= 10.0:
+			margin = 10.0
+		elif result.mass_margin_pct >= 0.0:
+			margin = 6.0
+	var score := clampf(primary + bonus * 5.0 + efficiency + margin, 0.0, 100.0)
+	var stars := 0
+	var outcome := "Mission Loss"
+	var sp_rate := 0.4
+	if completed > 0 and completed < total:
+		outcome = "Partial Success"
+		sp_rate = 0.6
+	elif total > 0 and completed == total:
+		outcome = "Success"
+		stars = 3 if score >= 85.0 else (2 if score >= 70.0 else 1)
+		sp_rate = [0.0, 0.7, 0.85, 1.0][stars]
+	var sp: int = floori(float(mission.rewardSciencePoints) * (0.25 if result.get("is_replay", false) else sp_rate + bonus * 0.05))
+	return {"outcome": outcome, "stars": stars, "score": score, "primary": primary, "bonus": bonus * 5.0, "efficiency": efficiency, "mass_margin": margin, "science_points": sp, "funds_millions": float(mission.rewardFundsMillions) * fraction, "mission_number": int(mission.missionNumber)}
+
+func finalize_mission(result: Dictionary) -> Dictionary:
+	var id: String = result.get("attempt_id", attempt_id)
+	if id.is_empty() or current_mission.is_empty() or int(result.get("mission_number", 0)) != int(current_mission.missionNumber) or id != attempt_id:
+		return {}
+	if last_receipt.get("attempt_id", "") == id:
+		return last_receipt
+	var evaluated := result.duplicate(true)
+	evaluated["is_replay"] = attempt_is_replay
+	var receipt := compute_score(evaluated)
+	if receipt.is_empty():
+		return {}
+	receipt["attempt_id"] = id
+	receipt["flight_log"] = result.get("flight_log", []).duplicate()
+	receipt["unlocks"] = []
+	funds_millions += receipt.funds_millions
+	science_points += receipt.science_points
+	var number := int(current_mission.missionNumber)
+	if receipt.outcome == "Success" and not number in completed_missions:
+		completed_missions.append(number)
+		if current_mission.has("unlocksTier"):
+			unlocked_tier = maxi(unlocked_tier, int(current_mission.unlocksTier))
+			receipt.unlocks.append("Tier %d" % unlocked_tier)
+		if number == 3:
+			if not "L11" in owned_tech_nodes: owned_tech_nodes.append("L11")
+			if not "launcher_falcon_9" in unlocked_part_ids: unlocked_part_ids.append("launcher_falcon_9")
+			receipt.unlocks.append("SpaceX Falcon 9")
+	last_result = result.duplicate(true)
+	last_receipt = receipt
+	state = State.DEBRIEF
+	campaign_changed.emit()
+	return receipt
+
+func _input(event: InputEvent) -> void:
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9:
+		_debug_panel.visible = not _debug_panel.visible
+
+func _create_debug_panel() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var panel := PanelContainer.new()
+	panel.position = Vector2(20, 80)
+	panel.visible = false
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("17212f")
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+	layer.add_child(panel)
+	_debug_panel = panel
+	var box := VBoxContainer.new()
+	panel.add_child(box)
+	var label := Label.new()
+	label.text = "DEBUG (F9)"
+	box.add_child(label)
+	var toggle := CheckButton.new()
+	toggle.text = "Disable reliability roll"
+	toggle.toggled.connect(func(value: bool): debug_disable_reliability = value)
+	box.add_child(toggle)
+	for entry in ["+100 SP", "Unlock all missions", "Unlock all parts"]:
+		var button := Button.new()
+		button.text = entry
+		button.pressed.connect(_debug_action.bind(entry))
+		box.add_child(button)
+
+func _debug_action(action: String) -> void:
+	match action:
+		"+100 SP": science_points += 100
+		"Unlock all missions": debug_unlock_missions = true
+		"Unlock all parts":
+			for part in GlobalData.components:
+				if not part.id in unlocked_part_ids: unlocked_part_ids.append(part.id)
+	campaign_changed.emit()

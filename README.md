@@ -63,3 +63,9 @@ Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and th
 Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch remains disabled until the readiness review is implemented.
 
 Run the assembly checks with `godot --headless --path . --script res://tests/test_workshop.gd`. Workshop, data, and FlightSim headless checks pass on Godot 4.7.2. A temporary Compatibility Web export loaded in the in-app browser; adding/removing a part and keyboard camera rotation were visually checked. Native scene startup was checked, but native visual interaction, browser scrolling, and resize remain to be verified.
+
+## Campaign flow
+
+New Campaign initializes and saves a new agency; Continue restores `user://save.json`. Mission Select opens the Workshop, and later flight scenes can provide `GameManager.last_result` and enter `scenes/Debrief.tscn` for scoring and settlement. A running mission must be started with `GameManager.start_mission(number)` so the debrief has its attempt identity. Reopening the same debrief does not pay twice. Failed saves can be retried.
+
+Run campaign tests with `godot --headless --path . --script res://tests/test_campaign.gd`. The deliberately corrupt-save case prints a JSON parse error. The campaign, Workshop, FlightSim, and data suites pass on Godot 4.7.2. An isolated Web fixture verified a successful debrief, Mission 2 unlock, saved balances after reload, Workshop navigation, and debug controls; F9 was also checked in a release export. Native visual interaction remains unverified.
