@@ -1,0 +1,41 @@
+[
+  {
+    "id": "launcher_electron",
+    "name": "Rocket Lab Electron",
+    "tier": 0,
+    "costMillions": 8.5,
+    "baseReliability": 0.88,
+    "fairingDiameterMeters": 1.2,
+    "fairingHeightMeters": 2.5,
+    "capacityLeoKg": 300,
+    "capacityGtoKg": 0,
+    "capacityTliKg": 0,
+    "heritage": "Electron is Rocket Lab’s small-satellite launch vehicle."
+  },
+  {
+    "id": "launcher_vega_c",
+    "name": "ESA Vega-C / ISRO PSLV",
+    "tier": 1,
+    "costMillions": 45,
+    "baseReliability": 0.93,
+    "fairingDiameterMeters": 3.3,
+    "fairingHeightMeters": 9,
+    "capacityLeoKg": 2300,
+    "capacityGtoKg": 1000,
+    "capacityTliKg": 500,
+    "heritage": "Vega-C and PSLV are medium-class launch vehicles represented together for gameplay."
+  },
+  {
+    "id": "launcher_falcon_9",
+    "name": "SpaceX Falcon 9",
+    "tier": 2,
+    "costMillions": 70,
+    "baseReliability": 0.97,
+    "fairingDiameterMeters": 5.2,
+    "fairingHeightMeters": 13.1,
+    "capacityLeoKg": 17500,
+    "capacityGtoKg": 5500,
+    "capacityTliKg": 3800,
+    "heritage": "Falcon 9 launched Bangabandhu Satellite-1 in 2018."
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "bus_cubesat_1u_3u",
+    "name": "1U/3U CubeSat Platform",
+    "tier": 0,
+    "dryMassKg": 1.5,
+    "internalVolumeLiters": 3,
+    "costMillions": 0.3,
+    "heritage": "BRAC Onnesha was a 1U CubeSat launched in 2017.",
+    "dimensionsMeters": [
+      0.1,
+      0.1,
+      0.34
+    ]
+  },
+  {
+    "id": "bus_cubesat_12u",
+    "name": "12U Deep-Space CubeSat",
+    "tier": 0,
+    "dryMassKg": 16,
+    "internalVolumeLiters": 12,
+    "costMillions": 1,
+    "heritage": "NASA CAPSTONE is a 12U lunar CubeSat.",
+    "dimensionsMeters": [
+      0.23,
+      0.23,
+      0.34
+    ]
+  },
+  {
+    "id": "bus_microsat_50",
+    "name": "SSTL-50 / BCT-100 Microsat",
+    "tier": 1,
+    "dryMassKg": 60,
+    "internalVolumeLiters": 150,
+    "costMillions": 3.5,
+    "heritage": "Surrey has built small satellites for disaster monitoring.",
+    "dimensionsMeters": [
+      0.6,
+      0.6,
+      0.6
+    ]
+  },
+  {
+    "id": "bus_midsat_500",
+    "name": "Blue Canyon BCT-500 Midsat",
+    "tier": 2,
+    "dryMassKg": 180,
+    "internalVolumeLiters": 600,
+    "costMillions": 10,
+    "heritage": "Lunar Reconnaissance Orbiter is a lunar science orbiter.",
+    "dimensionsMeters": [
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "id": "bus_heavy_geo_lunar",
+    "name": "Spacebus / Lunar Lander Bus",
+    "tier": 2,
+    "dryMassKg": 350,
+    "internalVolumeLiters": 2500,
+    "costMillions": 25,
+    "heritage": "Bangabandhu Satellite-1 used a Spacebus 4000B2 platform.",
+    "dimensionsMeters": [
+      1.8,
+      1.8,
+      1.6
+    ]
+  }
+]

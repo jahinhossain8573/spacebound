@@ -1,0 +1,145 @@
+[
+  {
+    "missionNumber": 1,
+    "id": "mission_1",
+    "title": "First Signal: BRAC Onnesha",
+    "briefing": "Build a CubeSat to send its first signal from low Earth orbit. Keep its battery charged throughout the seven-day mission.",
+    "targetOrbit": "LEO",
+    "targetAltitudeKm": 400,
+    "durationDays": 7,
+    "requiredLauncher": "launcher_electron",
+    "requiredBus": "bus_cubesat_1u_3u",
+    "requiredPartIds": [
+      "com_endurosat_uhf",
+      "pwr_gomspace_p31u"
+    ],
+    "requiredCapabilities": [
+      "battery"
+    ],
+    "requiredDeltaVMps": 0,
+    "budgetCapMillions": 12,
+    "rewardFundsMillions": 16,
+    "rewardSciencePoints": 15,
+    "unlocksTier": 1,
+    "historyNote": "Electron is a gameplay choice. The real BRAC Onnesha launched on SpaceX Falcon 9 (CRS-11 cargo flight to the ISS) in June 2017 and was deployed from the ISS Kibo module in July 2017."
+  },
+  {
+    "missionNumber": 2,
+    "id": "mission_2",
+    "title": "Orbital Sentinel",
+    "briefing": "Build an imaging CubeSat and operate it for 30 days. Balance the camera and radio power demands.",
+    "targetOrbit": "LEO",
+    "targetAltitudeKm": 500,
+    "durationDays": 30,
+    "requiredLauncher": "launcher_electron",
+    "requiredBus": "bus_cubesat_12u",
+    "requiredPartIds": [
+      "inst_nanocam_c1u",
+      "com_syrlinks_ewc27",
+      "adcs_rw003"
+    ],
+    "requiredCapabilities": [
+      "battery"
+    ],
+    "requiredDeltaVMps": 0,
+    "budgetCapMillions": 16,
+    "rewardFundsMillions": 28,
+    "rewardSciencePoints": 30
+  },
+  {
+    "missionNumber": 3,
+    "id": "mission_3",
+    "title": "Delta Flood Watch",
+    "briefing": "Place a flood-monitoring spacecraft in Sun-synchronous orbit. Return observations of the Bengal Delta.",
+    "targetOrbit": "SSO",
+    "targetAltitudeKm": 650,
+    "durationDays": 14,
+    "requiredLauncher": "launcher_electron",
+    "requiredBus": "bus_microsat_50",
+    "requiredPartIds": [
+      "inst_hyperscout2",
+      "com_syrlinks_ewc30"
+    ],
+    "requiredCapabilities": [
+      "battery"
+    ],
+    "requiredDeltaVMps": 0,
+    "budgetCapMillions": 30,
+    "rewardFundsMillions": 52,
+    "rewardSciencePoints": 70,
+    "unlocksTier": 2
+  },
+  {
+    "missionNumber": 4,
+    "id": "mission_4",
+    "title": "Geostationary Gateway: Bangabandhu Satellite-1",
+    "briefing": "Build a communications satellite and circularize its orbit at geostationary altitude. Operate it for one year.",
+    "targetOrbit": "GEO",
+    "targetAltitudeKm": 35786,
+    "durationDays": 365,
+    "requiredLauncher": "launcher_falcon_9",
+    "requiredBus": "bus_heavy_geo_lunar",
+    "requiredPartIds": [
+      "inst_kuka_transponder_suite",
+      "prop_aerojet_r4d15"
+    ],
+    "requiredCapabilities": [
+      "battery",
+      "radiationHardened"
+    ],
+    "requiredDeltaVMps": 1500,
+    "budgetCapMillions": 180,
+    "rewardFundsMillions": 175,
+    "rewardSciencePoints": 110,
+    "unlocksTier": 3
+  },
+  {
+    "missionNumber": 5,
+    "id": "mission_5",
+    "title": "Cislunar Pathfinder (stretch)",
+    "briefing": "Send a small spacecraft on a lunar flyby. Maintain deep-space communications during the journey.",
+    "targetOrbit": "Lunar Flyby",
+    "targetAltitudeKm": 384400,
+    "durationDays": 6,
+    "requiredLauncher": "launcher_vega_c",
+    "requiredBus": "bus_cubesat_12u",
+    "requiredPartIds": [
+      "com_gd_sdst",
+      "inst_lroc_wac"
+    ],
+    "requiredCapabilities": [
+      "battery",
+      "radiationHardened"
+    ],
+    "requiredDeltaVMps": 50,
+    "budgetCapMillions": 75,
+    "rewardFundsMillions": 105,
+    "rewardSciencePoints": 80,
+    "unlocksTier": 4
+  },
+  {
+    "missionNumber": 7,
+    "id": "mission_7",
+    "title": "Lunar Touchdown (stretch)",
+    "briefing": "Build a lunar lander with descent propulsion, radar, landing gear, and a thermal probe. Reach the surface safely.",
+    "targetOrbit": "Lunar Surface",
+    "targetAltitudeKm": 0,
+    "durationDays": 14,
+    "requiredLauncher": "launcher_falcon_9",
+    "requiredBus": "bus_heavy_geo_lunar",
+    "requiredPartIds": [
+      "prop_lpsc_throttleable",
+      "inst_kara_landing_radar",
+      "land_hex_gear",
+      "inst_chaste_probe"
+    ],
+    "requiredCapabilities": [
+      "battery",
+      "radiationHardened"
+    ],
+    "requiredDeltaVMps": 2800,
+    "budgetCapMillions": 180,
+    "rewardFundsMillions": 210,
+    "rewardSciencePoints": 180
+  }
+]
