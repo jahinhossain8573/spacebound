@@ -47,3 +47,13 @@ Windows execution testing remains for the final release issue.
 - Chrome for Testing 157.0.8103.38 completed startup and resized to 1280×720 and 900×900. The navy canvas filled both viewports with no console errors or failed requests. Screenshots and console logs are in `build/checks/`.
 - Firefox validation is **blocked**: the temporary Firefox 159.0 Playwright build cannot load a profile, including when opened through the desktop launcher. It fails before loading the game. Repeat the browser smoke test in a working Firefox installation before marking that acceptance item complete.
 - Public hosting is **deferred**. No public URL is available, and the public deployment acceptance item remains open.
+
+## FlightSim calculations
+
+Run the physics checks with `godot --headless --path . --script res://tests/test_flightsim.gd`. Each check prints PASS/FAIL, and failures exit with status 1.
+
+`FlightSim` provides pure rocket, orbit, burn, eclipse, and battery calculations. Orbital distances and apsis radii are in kilometres from the body's center; orbital speeds are km/s. Rocket delta-v is m/s, mass is kg, Isp and time are seconds, power is watts, and battery capacity is Wh. The tangential-burn helper assumes zero radial velocity at the burn point; unbound results contain only `escaped: true`.
+
+Mission skipping starts with a full battery at the beginning of sunlight, processes sunlight then eclipse, and truncates the final orbit to the requested duration. Reaching zero charge fails; `failed_orbit` is one-based, or -1 on survival. Orbit propagation supports ellipses (`0 <= eccentricity < 1`), with periapsis on +x; invalid elements return `Vector2.ZERO`.
+
+Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and the project startup smoke check pass.
