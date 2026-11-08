@@ -1,0 +1,9 @@
+[gd_resource type="Theme" load_steps=2 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Roboto.res" id="1_font"]
+
+[resource]
+default_font = ExtResource("1_font")
+Spacebounds/colors/accent = Color(0, 0.898039, 1, 1)
+Spacebounds/colors/warning = Color(1, 0.701961, 0, 1)
+Spacebounds/colors/failure = Color(1, 0.301961, 0.301961, 1)
