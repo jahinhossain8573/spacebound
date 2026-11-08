@@ -77,3 +77,11 @@ Workshop telemetry updates as parts and propellant change. Run Readiness Review 
 Run checks with `godot --headless --path . --script res://tests/test_readiness.gd`. The readiness, Workshop, campaign, FlightSim, and data tests pass on Godot 4.7.2. An isolated Web preview was checked for the report, Mission 1 assembly, live updates, and launch handoff. Native visual interaction and browser resize/scroll checks remain unverified.
 
 `GameManager.current_build` holds `launcher`, `bus`, `installed_components`, `propellant_mass_kg`, and `stats`; stats include power, battery, mass, volume, delta-v, cost, and landing TWR. Mission 7 landing mass uses the 2,600 m/s pre-landing handoff from SPA-23.
+
+## Flight preview
+
+Run `godot --path . res://scenes/FlightView.tscn` (or F6 in the editor). It previews Mission 1 when no mission is selected. Choose 1/10/100/1000x warp and Spacecraft/Earth/Wide camera presets. Right-drag or use arrows over the viewport to rotate, and scroll or use +/- to zoom. No burns, battery simulation, or completion are implemented here.
+
+`GameManager.initial_orbit` accepts an `OrbitState` handoff; FlightView copies it. `FlightView.set_orbit()` validates and redraws an orbit without resetting total elapsed time. Lunar missions require their dedicated flight scenes.
+
+Run `godot --headless --path . --script res://tests/test_orbit.gd`. All orbit and existing regression suites pass on Godot 4.7.2. Native rendering was captured in `build/checks/flight-native.png`; Web rendering, warp, camera presets, keyboard rotation, and the eclipse indicator were visually checked. Browser resizing and native interactive controls remain unverified.
