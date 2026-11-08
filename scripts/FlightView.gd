@@ -23,6 +23,7 @@ var _dragging := false
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.FLIGHT_OPS
+	mission_elapsed_s = GameManager.flight_elapsed_s
 	mission = GameManager.current_mission if not GameManager.current_mission.is_empty() else GlobalData.get_mission(1)
 	_build_scene()
 	if mission.get("targetOrbit", "") not in ["LEO", "SSO", "GEO", "GTO"]:

@@ -19,6 +19,9 @@ var last_receipt: Dictionary = {}
 var attempt_id: String = ""
 var attempt_is_replay: bool = false
 var save_path := "user://save.json"
+var has_launched_once := false
+var flight_elapsed_s := 0.0
+var debug_force_launch_failure := false
 var debug_disable_reliability := false
 var debug_unlock_missions := false
 var _debug_panel: Control
@@ -42,6 +45,9 @@ func new_campaign() -> Error:
 	attempt_id = ""
 	attempt_is_replay = false
 	debug_disable_reliability = false
+	debug_force_launch_failure = false
+	has_launched_once = false
+	flight_elapsed_s = 0.0
 	debug_unlock_missions = false
 	for catalog in [GlobalData.launchers, GlobalData.buses, GlobalData.components]:
 		for item in catalog:
@@ -51,7 +57,7 @@ func new_campaign() -> Error:
 	return save_campaign()
 
 func save_campaign() -> Error:
-	var data := {"version": 1, "funds_millions": funds_millions, "science_points": science_points, "unlocked_part_ids": unlocked_part_ids, "owned_tech_nodes": owned_tech_nodes, "completed_missions": completed_missions, "unlocked_tier": unlocked_tier, "last_receipt": last_receipt}
+	var data := {"version": 1, "funds_millions": funds_millions, "science_points": science_points, "unlocked_part_ids": unlocked_part_ids, "owned_tech_nodes": owned_tech_nodes, "completed_missions": completed_missions, "unlocked_tier": unlocked_tier, "last_receipt": last_receipt, "has_launched_once": has_launched_once}
 	var temp := save_path + ".tmp"
 	var file := FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
@@ -88,6 +94,8 @@ func load_campaign() -> Error:
 	for item in data.completed_missions:
 		if not (item is int or item is float) or item != floor(item) or GlobalData.get_mission(int(item)).is_empty():
 			return ERR_FILE_CORRUPT
+	if not data.get("has_launched_once", false) is bool:
+		return ERR_FILE_CORRUPT
 	if not data.get("last_receipt") is Dictionary:
 		return ERR_FILE_CORRUPT
 	funds_millions = data.funds_millions
@@ -98,6 +106,8 @@ func load_campaign() -> Error:
 	completed_missions.clear()
 	for item in data.completed_missions:
 		completed_missions.append(int(item))
+	has_launched_once = data.get("has_launched_once", false)
+	flight_elapsed_s = 0.0
 	last_receipt = data.last_receipt
 	current_mission = {}
 	current_build = {}
@@ -121,6 +131,7 @@ func is_mission_unlocked(number: int) -> bool:
 func start_mission(number: int) -> bool:
 	if not is_mission_unlocked(number):
 		return false
+	flight_elapsed_s = 0.0
 	current_mission = GlobalData.get_mission(number)
 	current_build = {}
 	initial_orbit = null
@@ -237,6 +248,16 @@ func _create_debug_panel() -> void:
 	toggle.text = "Disable reliability roll"
 	toggle.toggled.connect(func(value: bool): debug_disable_reliability = value)
 	box.add_child(toggle)
+	var force_failure := CheckButton.new()
+	force_failure.text = "Force launch failure"
+	box.add_child(force_failure)
+	toggle.toggled.connect(func(value: bool):
+		if value: force_failure.button_pressed = false
+	)
+	force_failure.toggled.connect(func(value: bool):
+		debug_force_launch_failure = value
+		if value: toggle.button_pressed = false
+	)
 	for entry in ["+100 SP", "Unlock all missions", "Unlock all parts"]:
 		var button := Button.new()
 		button.text = entry
