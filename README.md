@@ -57,3 +57,9 @@ Run the physics checks with `godot --headless --path . --script res://tests/test
 Mission skipping starts with a full battery at the beginning of sunlight, processes sunlight then eclipse, and truncates the final orbit to the requested duration. Reaching zero charge fails; `failed_orbit` is one-based, or -1 on survival. Orbit propagation supports ellipses (`0 <= eccentricity < 1`), with periapsis on +x; invalid elements return `Vector2.ZERO`.
 
 Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and the project startup smoke check pass.
+
+## Workshop preview
+
+Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch remains disabled until the readiness review is implemented.
+
+Run the assembly checks with `godot --headless --path . --script res://tests/test_workshop.gd`. Workshop, data, and FlightSim headless checks pass on Godot 4.7.2. A temporary Compatibility Web export loaded in the in-app browser; adding/removing a part and keyboard camera rotation were visually checked. Native scene startup was checked, but native visual interaction, browser scrolling, and resize remain to be verified.
