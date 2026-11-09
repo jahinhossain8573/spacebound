@@ -260,7 +260,7 @@ func _create_debug_panel() -> void:
 		debug_force_launch_failure = value
 		if value: toggle.button_pressed = false
 	)
-	for entry in ["+100 SP", "Unlock all missions", "Unlock all parts"]:
+	for entry in ["+100 SP", "Unlock all missions", "Unlock all parts", "Unlock all nodes"]:
 		var button := Button.new()
 		button.text = entry
 		button.pressed.connect(_debug_action.bind(entry))
@@ -270,7 +270,55 @@ func _debug_action(action: String) -> void:
 	match action:
 		"+100 SP": science_points += 100
 		"Unlock all missions": debug_unlock_missions = true
+		"Unlock all nodes":
+			for node in GlobalData.tech_nodes:
+				if node.hackathonEnabled:
+					if not node.id in owned_tech_nodes: owned_tech_nodes.append(node.id)
+					for id in node.unlocksParts:
+						if not id in unlocked_part_ids: unlocked_part_ids.append(id)
+			unlocked_tier = 4
 		"Unlock all parts":
-			for part in GlobalData.components:
-				if not part.id in unlocked_part_ids: unlocked_part_ids.append(part.id)
+			for catalog in [GlobalData.components, GlobalData.buses, GlobalData.launchers]:
+				for part in catalog:
+					if not part.id in unlocked_part_ids: unlocked_part_ids.append(part.id)
 	campaign_changed.emit()
+
+func is_part_unlocked(id: String) -> bool:
+	for catalog in [GlobalData.components, GlobalData.buses, GlobalData.launchers]:
+		for item in catalog:
+			if item.id == id:
+				if item.tier == 0 or id in unlocked_part_ids: return true
+				for node in GlobalData.tech_nodes:
+					if node.id in owned_tech_nodes and id in node.unlocksParts: return true
+				return false
+	return false
+
+func research_status(id: String) -> String:
+	var node: Dictionary = GlobalData.get_tech_node(id)
+	if node.is_empty(): return "Unknown"
+	if id in owned_tech_nodes: return "Owned"
+	if not node.hackathonEnabled: return "Post-hackathon"
+	if id == "L11": return "Granted after Mission 3"
+	if node.tier > unlocked_tier: return "Locked by tier"
+	if node.prereqMission != null and int(node.prereqMission) not in completed_missions: return "Locked by prerequisite"
+	for prerequisite in node.prereqNodes:
+		if prerequisite not in owned_tech_nodes: return "Locked by prerequisite"
+	if science_points < node.cost: return "Not enough SP"
+	return "Available"
+
+func research_node(id: String) -> Error:
+	if research_status(id) != "Available": return ERR_UNAUTHORIZED
+	var node: Dictionary = GlobalData.get_tech_node(id)
+	var original_parts := unlocked_part_ids.duplicate()
+	science_points -= int(node.cost)
+	owned_tech_nodes.append(id)
+	for part_id in node.unlocksParts:
+		if part_id not in unlocked_part_ids: unlocked_part_ids.append(part_id)
+	var result := save_campaign()
+	if result != OK:
+		science_points += int(node.cost)
+		owned_tech_nodes.erase(id)
+		unlocked_part_ids.assign(original_parts)
+		return result
+	campaign_changed.emit()
+	return OK

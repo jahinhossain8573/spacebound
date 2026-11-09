@@ -303,7 +303,7 @@ func _engine() -> Dictionary:
 
 func add_part(part_id: String) -> bool:
 	var part: Dictionary = GlobalData.get_part(part_id)
-	if part.is_empty() or (part.tier != 0 and not part_id in GameManager.unlocked_part_ids):
+	if part.is_empty() or not GameManager.is_part_unlocked(part_id):
 		return false
 	if part.get("thrustNewtons", 0.0) > 0.0 and not _engine().is_empty():
 		return false

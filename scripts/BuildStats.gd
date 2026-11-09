@@ -23,7 +23,8 @@ func calculate_stats(build: Dictionary, mission: Dictionary) -> Dictionary:
 	var density: float = FlightSim.PROPELLANT_DENSITY_KG_L.get(engine.get("propellantType", ""), 0.0)
 	var fuel_valid := fuel <= 0.0 or density > 0.0
 	if fuel > 0.0 and density > 0.0: volume += fuel / density * (1.0 + FlightSim.ULLAGE_MARGIN)
-	var adapter: float = dry * FlightSim.ADAPTER_MASS_RATIO
+	var adapter_ratio: float = 0.01 if "L10" in GameManager.owned_tech_nodes else FlightSim.ADAPTER_MASS_RATIO
+	var adapter: float = dry * adapter_ratio
 	var wet := dry + fuel + adapter
 	var target: String = mission.get("targetOrbit", "")
 	var capacity := 0.0
@@ -85,7 +86,7 @@ func propellant_limits(build: Dictionary, mission: Dictionary) -> Dictionary:
 	empty["propellant_mass_kg"] = 0.0
 	var s := calculate_stats(empty, mission)
 	var density: float = FlightSim.PROPELLANT_DENSITY_KG_L.get(s.engine.get("propellantType", ""), 0.0)
-	var mass_limit: float = maxf(0.0, (s.launcher_capacity_kg * 0.9 - s.wet_mass_kg) / (1.0 + FlightSim.TANK_MASS_RATIO * (1.0 + FlightSim.ADAPTER_MASS_RATIO)))
+	var mass_limit: float = maxf(0.0, (s.launcher_capacity_kg * 0.9 - s.wet_mass_kg) / (1.0 + FlightSim.TANK_MASS_RATIO * (1.0 + (0.01 if "L10" in GameManager.owned_tech_nodes else FlightSim.ADAPTER_MASS_RATIO))))
 	var volume_limit: float = maxf(0.0, s.volume_capacity_liters - s.internal_volume_liters) * density / (1.0 + FlightSim.ULLAGE_MARGIN)
 	var budget_limit: float = maxf(0.0, s.budget_millions - s.cost_millions) / FlightSim.PROPELLANT_COST_PER_KG_M
 	var maximum := minf(mass_limit, minf(volume_limit, budget_limit)) if not s.engine.is_empty() else 0.0

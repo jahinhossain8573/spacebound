@@ -4,6 +4,8 @@ var launchers: Array[Dictionary] = []
 var buses: Array[Dictionary] = []
 var components: Array[Dictionary] = []
 var missions: Array[Dictionary] = []
+var tech_nodes: Array[Dictionary] = []
+var _tech_index: Dictionary = {}
 
 var _launcher_index: Dictionary = {}
 var _bus_index: Dictionary = {}
@@ -16,6 +18,8 @@ func _ready() -> void:
 	buses = _load_catalog("res://data/buses.json", "buses")
 	components = _load_catalog("res://data/components.json", "components")
 	missions = _load_catalog("res://data/missions.json", "missions")
+	tech_nodes = _load_tech_nodes("res://data/tech_tree.json")
+	for node in tech_nodes: _tech_index[node.id] = node
 	for item in launchers:
 		_launcher_index[item.id] = item
 	for item in buses:
@@ -152,9 +156,54 @@ func get_mission(number: int) -> Dictionary:
 func parts_by_subsystem(unlocked_only: bool = true) -> Dictionary:
 	var groups: Dictionary = {}
 	for part in components:
-		if unlocked_only and part.tier != 0 and not part.id in GameManager.unlocked_part_ids:
+		if unlocked_only and not GameManager.is_part_unlocked(part.id):
 			continue
 		if not groups.has(part.subsystem):
 			groups[part.subsystem] = []
 		groups[part.subsystem].append(part)
 	return groups
+
+func get_tech_node(id: String) -> Dictionary:
+	return _tech_index.get(id, {})
+
+func _load_tech_nodes(path: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not FileAccess.file_exists(path):
+		push_error("Cannot read tech catalog: " + path)
+		return out
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Array:
+		push_error("Invalid tech catalog: " + path)
+		return []
+	var ids := {}
+	for node in parsed:
+		if not node is Dictionary or not node.get("id") is String or node.id.is_empty() or ids.has(node.id) or not node.get("name") is String or not node.get("branch") in ["launch","power","comms","adcs_prop","instruments","landing"] or not _is_number(node.get("tier")) or node.tier < 0 or node.tier > 4 or not _is_number(node.get("cost")) or node.cost < 0 or not node.get("prereqNodes") is Array or not node.get("unlocksParts") is Array or not node.get("hackathonEnabled") is bool or not node.get("description") is String:
+			push_error("Invalid tech record: " + path)
+			return []
+		ids[node.id] = true
+		if node.tier != floor(node.tier) or node.cost != floor(node.cost) or not node.has("prereqMission") or not node.has("effect") or (node.effect != null and not node.effect is Dictionary):
+			push_error("Invalid tech record: " + path)
+			return []
+		if node.prereqMission != null:
+			var mission_found := false
+			if _is_number(node.prereqMission):
+				for mission in missions:
+					if mission.missionNumber == node.prereqMission: mission_found = true
+			if not mission_found:
+				push_error("Invalid tech mission prerequisite: " + path)
+				return []
+		out.append(node)
+	for node in out:
+		for required in node.prereqNodes:
+			if not required is String or not ids.has(required):
+				push_error("Invalid tech prerequisite: " + path)
+				return []
+		for part_id in node.unlocksParts:
+			var found := false
+			for catalog in [launchers, buses, components]:
+				for item in catalog:
+					if item.id == part_id: found = true
+			if not found:
+				push_error("Invalid tech unlock: " + path)
+				return []
+	return out

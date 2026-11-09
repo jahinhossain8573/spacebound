@@ -122,3 +122,9 @@ Run `godot --headless --path . --script res://tests/test_mission1.gd`. Mission 1
 In FlightView, enter Δv in m/s, choose prograde or retrograde, and execute. The panel shows remaining fuel, available Δv, estimated burn duration, and the predicted apsides. Wait for apoapsis or periapsis to warp to the chosen point; these controls are disabled for circular orbits. The model turns before the impulse, and fuel remains aboard the transient flight state. Escaping or unaffordable burns are rejected. Burns are planar and instantaneous; finite-duration physics and maneuver nodes are future work.
 
 Run `godot --headless --path . --script res://tests/test_burns.gd`. The burn, orbit, launch, power, Mission 1, physics, readiness, and campaign checks pass. An isolated Web preview verified entering 1,470 m/s, waiting for apoapsis, circularizing the GTO orbit, fuel reduction, and enabling mission-time Skip. Public hosting remains deferred.
+
+## Research
+
+Open Research from Mission Select to spend Science Points on parts and effects. Nodes display their tier, prerequisites, cost, unlocks, and status; unavailable future nodes are marked Post-hackathon. Tier gates open after Missions 1, 3, 4, and 5. Mission 3 grants L11 and Falcon 9 automatically. Mission launchers and buses remain fixed; research their required hardware before starting a mission.
+
+`godot --headless --path . --script res://tests/test_research.gd` checks the research path, prerequisites, save rollback and persistence, Falcon grant, and the L10 adapter effect. The source design lists 50 distinct nodes (28 enabled in the hackathon); all 50 are included. Research and existing regression suites pass, and a release Web export succeeds. An isolated browser preview verified the tree, A1 purchase, and updated balance; native interaction and browser resize remain unverified.

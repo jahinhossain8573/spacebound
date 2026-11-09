@@ -144,11 +144,15 @@ func _select_mission(mission: Dictionary) -> void:
 		names.append(GlobalData.get_part(id).get("name", id))
 	_label("Required: " + ", ".join(names), _details)
 	_label("Budget $%.2fM · Reward $%.2fM / %d SP" % [mission.budgetCapMillions, mission.rewardFundsMillions, mission.rewardSciencePoints], _details)
+	var missing: Array[String] = []
+	if not GameManager.is_part_unlocked(mission.requiredLauncher): missing.append(str(GlobalData.get_launcher(mission.requiredLauncher).get("name", mission.requiredLauncher)))
+	if not GameManager.is_part_unlocked(mission.requiredBus): missing.append(str(GlobalData.get_bus(mission.requiredBus).get("name", mission.requiredBus)))
+	if not missing.is_empty(): _label("Research required: " + ", ".join(missing), _details, Color("ffb300"))
 	_start_button = _button("Start", _start_selected, _details)
-	_start_button.disabled = not GameManager.is_mission_unlocked(int(mission.missionNumber))
+	_start_button.disabled = not GameManager.is_mission_unlocked(int(mission.missionNumber)) or not missing.is_empty()
 
 func _start_selected() -> void:
-	if GameManager.start_mission(int(_selected.missionNumber)):
+	if GameManager.is_part_unlocked(_selected.requiredLauncher) and GameManager.is_part_unlocked(_selected.requiredBus) and GameManager.start_mission(int(_selected.missionNumber)):
 		get_tree().change_scene_to_file("res://scenes/Workshop.tscn")
 
 func _debrief() -> void:
@@ -173,6 +177,7 @@ func _debrief() -> void:
 		_body.add_child(bar)
 	_label("Payout: $%.2fM and %d SP" % [receipt.funds_millions, receipt.science_points])
 	if not receipt.unlocks.is_empty(): _label("Unlocked: " + ", ".join(receipt.unlocks), null, Color("ffb300"))
+	if "SpaceX Falcon 9" in receipt.unlocks: _label("SpaceX Falcon 9 now available", null, Color("00e5ff"))
 	_label("Objectives")
 	for objective in GameManager.last_result.get("objectives", []):
 		_label(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
@@ -198,7 +203,7 @@ func _refresh_campaign_ui() -> void:
 		button.disabled = not GameManager.is_mission_unlocked(number)
 		button.text = "%d. %s%s" % [number, GlobalData.get_mission(number).title, " [Locked]" if button.disabled else ""]
 	if is_instance_valid(_start_button):
-		_start_button.disabled = not GameManager.is_mission_unlocked(int(_selected.missionNumber))
+		_start_button.disabled = not GameManager.is_mission_unlocked(int(_selected.missionNumber)) or not GameManager.is_part_unlocked(_selected.requiredLauncher) or not GameManager.is_part_unlocked(_selected.requiredBus)
 
 func _exit_tree() -> void:
 	if GameManager.campaign_changed.is_connected(_refresh_campaign_ui):

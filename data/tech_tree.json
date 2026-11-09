@@ -1,0 +1,828 @@
+[
+  {
+    "id": "L1",
+    "name": "Microsatellite Bus Platform",
+    "branch": "launch",
+    "tier": 1,
+    "cost": 6,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "bus_microsat_50"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Enables 60 kg spacecraft with 150 L payload volume.",
+    "heritage": "SSTL-50 / BCT-100 Bus"
+  },
+  {
+    "id": "L2",
+    "name": "Medium-Lift Launch Vehicle",
+    "branch": "launch",
+    "tier": 1,
+    "cost": 8,
+    "prereqNodes": [],
+    "prereqMission": 3,
+    "unlocksParts": [
+      "launcher_vega_c"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "LEO capability expands to 2,300 kg; opens GTO capability (1,000 kg).",
+    "heritage": "ESA Vega-C / ISRO PSLV"
+  },
+  {
+    "id": "L3",
+    "name": "Midsatellite Bus Platform",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [
+      "L1"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "bus_midsat_500"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "180 kg structure with 600 L volume for lunar mapping payloads.",
+    "heritage": "Blue Canyon BCT-500 Bus"
+  },
+  {
+    "id": "L4",
+    "name": "High-Capacity Spacecraft Bus",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 16,
+    "prereqNodes": [
+      "L3"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "bus_heavy_geo_lunar"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "350 kg dry bus for multi-kilowatt GEO comms and lunar landers.",
+    "heritage": "Thales Spacebus / Vikram Bus"
+  },
+  {
+    "id": "L5",
+    "name": "Component Qualification (Test Campaign I)",
+    "branch": "launch",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Unlocks optional pre-launch testing; cuts subsystem anomaly risk by 30%.",
+    "heritage": "Thermal & Component Test Facility"
+  },
+  {
+    "id": "L6",
+    "name": "System TVAC (Test Campaign II)",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [
+      "L5"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "System-level vibration & TVAC tests; cuts failure risk by 50% and adds +5% landing roll.",
+    "heritage": "Thermal-Vacuum Chamber & Shaker Table"
+  },
+  {
+    "id": "L7",
+    "name": "Propulsion Quality Assurance I",
+    "branch": "launch",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": {
+      "launchReliability": 0.02
+    },
+    "hackathonEnabled": true,
+    "description": "+2% reliability across all launch vehicles.",
+    "heritage": "Quality Control Program I"
+  },
+  {
+    "id": "L8",
+    "name": "Propulsion Quality Assurance II",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 10,
+    "prereqNodes": [
+      "L7"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": {
+      "launchReliability": 0.02
+    },
+    "hackathonEnabled": true,
+    "description": "+2% additional reliability across all launch vehicles.",
+    "heritage": "Quality Control Program II"
+  },
+  {
+    "id": "L9",
+    "name": "Avionics Redundancy Standards",
+    "branch": "launch",
+    "tier": 3,
+    "cost": 18,
+    "prereqNodes": [
+      "L8",
+      "L6"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "+2% additional reliability across all launch vehicles (capped at 99%).",
+    "heritage": "Dual-String Avionics Protocol"
+  },
+  {
+    "id": "L10",
+    "name": "Composite Payload Adapter Optimization",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [
+      "L2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": {
+      "adapterMassRatio": 0.01
+    },
+    "hackathonEnabled": true,
+    "description": "Adapter overhead penalty drops from 2% to 1% of dry mass.",
+    "heritage": "Optimized Carbon Clampband"
+  },
+  {
+    "id": "L11",
+    "name": "Heavy Reusable Launch Vehicle",
+    "branch": "launch",
+    "tier": 2,
+    "cost": 0,
+    "prereqNodes": [],
+    "prereqMission": 3,
+    "unlocksParts": [
+      "launcher_falcon_9"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "High-energy cislunar capability: 3,800 kg to TLI, 5,500 kg to GTO.",
+    "heritage": "SpaceX Falcon 9"
+  },
+  {
+    "id": "P1",
+    "name": "Deployable Arrays & Medium Storage",
+    "branch": "power",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "pwr_spectrolab_m",
+      "pwr_abs_slc_m"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Provides -320 W solar generation and 250 Wh battery reserve.",
+    "heritage": "Spectrolab Wing (M) & ABS SLC Battery (M)"
+  },
+  {
+    "id": "P2",
+    "name": "Kilowatt Arrays & Heavy Energy Storage",
+    "branch": "power",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "pwr_airbus_l",
+      "pwr_eaglepicher_l"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Generates -1,300 W and stores 2.2 kWh for multi-transponder GEO comms.",
+    "heritage": "Airbus High-Power Array (L) & EaglePicher Battery (L)"
+  },
+  {
+    "id": "P3",
+    "name": "Triple-Junction Solar Cell Optimization",
+    "branch": "power",
+    "tier": 3,
+    "cost": 22,
+    "prereqNodes": [
+      "P2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Increases array generation efficiency by +15% (300 to 345 W/m^2).",
+    "heritage": "Spectrolab XTJ Prime Solar Cells"
+  },
+  {
+    "id": "P4",
+    "name": "NASA RHU & Cryogenic Thermal Shield",
+    "branch": "power",
+    "tier": 4,
+    "cost": 25,
+    "prereqNodes": [
+      "P2"
+    ],
+    "prereqMission": 7,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Plutonium-238 decay heat keeps lander and rover electronics alive during 14-day night.",
+    "heritage": "NASA RHU + MLI Lunar Night Kit"
+  },
+  {
+    "id": "C1",
+    "name": "High-Data-Rate X-Band Downlink",
+    "branch": "comms",
+    "tier": 1,
+    "cost": 6,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "com_syrlinks_ewc30"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Boosts downlink bandwidth to 100 Mbps in LEO for multispectral imaging.",
+    "heritage": "Syrlinks EWC30 X-Band Transmitter"
+  },
+  {
+    "id": "C2",
+    "name": "Lossless Data Compression Algorithms",
+    "branch": "comms",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [
+      "C1"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Reduces raw scientific downlink volume by 30% without data loss.",
+    "heritage": "CCSDS On-Board Image Compressor"
+  },
+  {
+    "id": "C3",
+    "name": "Deep Space Transponder & 0.3m Dish",
+    "branch": "comms",
+    "tier": 3,
+    "cost": 15,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "com_gd_sdst"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Enables 200 kbps two-way link at lunar distance with NASA DSN ground stations.",
+    "heritage": "General Dynamics SDST + 0.3m Cassegrain"
+  },
+  {
+    "id": "C4",
+    "name": "High-Gain Gimballed 1.0m Dish Antenna",
+    "branch": "comms",
+    "tier": 3,
+    "cost": 22,
+    "prereqNodes": [
+      "C3"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Provides high-bandwidth 2.5 Mbps at the Moon and 50 Mbps at geostationary orbit.",
+    "heritage": "Carbon-Composite 1.0m Reflector"
+  },
+  {
+    "id": "A1",
+    "name": "Precision 3-Axis Reaction Wheel Array",
+    "branch": "adcs_prop",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "adcs_rw003"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Active 3-axis pointing control for Earth observation cameras.",
+    "heritage": "Rocket Lab RW-0.03 RWA"
+  },
+  {
+    "id": "A2",
+    "name": "Miniature Optical Star Tracker",
+    "branch": "adcs_prop",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [
+      "A1"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "adcs_st16"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Sub-arcsecond autonomous attitude determination for scientific observations.",
+    "heritage": "Rocket Lab ST-16 Star Tracker"
+  },
+  {
+    "id": "A3",
+    "name": "Hydrazine Monopropellant Propulsion",
+    "branch": "adcs_prop",
+    "tier": 1,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "prop_mr103g"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "22 N thrust, 227 s  I_{sp for orbit maintenance and collision avoidance.",
+    "heritage": "Aerojet Rocketdyne MR-103G Thruster"
+  },
+  {
+    "id": "A4",
+    "name": "Active Thermal Control for Microsats",
+    "branch": "adcs_prop",
+    "tier": 1,
+    "cost": 4,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "thm_mli_m"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Regulates component temperatures under continuous solar exposure.",
+    "heritage": "Thermal MLI Kit (M)"
+  },
+  {
+    "id": "A5",
+    "name": "Radiation-Hardened Deep Space Computing",
+    "branch": "adcs_prop",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "av_bae_rad750"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Essential for GEO and Moon. Zero latch-up under cosmic rays and CMEs.",
+    "heritage": "BAE Systems RAD750 OBC"
+  },
+  {
+    "id": "A6",
+    "name": "High-Torque Heavy Reaction Wheels",
+    "branch": "adcs_prop",
+    "tier": 2,
+    "cost": 10,
+    "prereqNodes": [
+      "A1"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "adcs_hr14"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Rapid slewing and pointing stability for large satellites and landers.",
+    "heritage": "Honeywell HR14 High-Torque RWA"
+  },
+  {
+    "id": "A7",
+    "name": "Heavy Bus Cryogenic Thermal Enclosure",
+    "branch": "adcs_prop",
+    "tier": 2,
+    "cost": 8,
+    "prereqNodes": [
+      "A4"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "thm_mli_l"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Multi-layer insulation blankets for large GEO platforms and lunar buses.",
+    "heritage": "Thermal MLI Kit (L)"
+  },
+  {
+    "id": "A8",
+    "name": "High-Performance Bipropellant Apogee Engine",
+    "branch": "adcs_prop",
+    "tier": 2,
+    "cost": 15,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "prop_aerojet_r4d15"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "490 N, 315 s  I_{sp. Enables GTO to GEO circularization and Lunar Orbit Insertion.",
+    "heritage": "Aerojet Rocketdyne R-4D-15 Engine"
+  },
+  {
+    "id": "A9",
+    "name": "Electric Hall Effect Propulsion",
+    "branch": "adcs_prop",
+    "tier": 3,
+    "cost": 22,
+    "prereqNodes": [
+      "A8",
+      "P2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "2,200 s  I_{sp. Low-thrust, high-efficiency transfers; requires continuous 350 W.",
+    "heritage": "Safran PPS-1350 / Busek Hall Thruster"
+  },
+  {
+    "id": "I1",
+    "name": "Cosmic Ray Space Radiation Sensor",
+    "branch": "instruments",
+    "tier": 1,
+    "cost": 4,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_crater"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Measures ionizing radiation environment in Van Allen Belts and cislunar space.",
+    "heritage": "NASA CRaTER Space Weather Detector"
+  },
+  {
+    "id": "I2",
+    "name": "Multispectral Environmental Imager",
+    "branch": "instruments",
+    "tier": 1,
+    "cost": 10,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_hyperscout2"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Monitors flood patterns, river deltas, agriculture, and forestry.",
+    "heritage": "cosine HyperScout-2 / MultiScape"
+  },
+  {
+    "id": "I3",
+    "name": "Thermal Infrared Meteorological Sensor",
+    "branch": "instruments",
+    "tier": 2,
+    "cost": 10,
+    "prereqNodes": [
+      "I2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Detects cyclone formation, sea surface temperatures, and drought stress.",
+    "heritage": "Landsat-8 TIRS Thermal Sensor"
+  },
+  {
+    "id": "I4",
+    "name": "High-Resolution Earth Telescope",
+    "branch": "instruments",
+    "tier": 2,
+    "cost": 12,
+    "prereqNodes": [
+      "I2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Detailed sub-meter ground mapping for urban infrastructure and navigation.",
+    "heritage": "WorldView-Class Optical Camera"
+  },
+  {
+    "id": "I5",
+    "name": "Commercial Ku/Ka Transponder Suite",
+    "branch": "instruments",
+    "tier": 2,
+    "cost": 15,
+    "prereqNodes": [
+      "A5",
+      "P2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_kuka_transponder_suite"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "High-throughput communications transponders (Bangabandhu Satellite-1).",
+    "heritage": "Commercial GEO Transponders"
+  },
+  {
+    "id": "I6",
+    "name": "Cislunar Optical Flyby Camera",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 8,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_lroc_wac"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Captures high-definition imagery during lunar flybys and approaches.",
+    "heritage": "LROC Wide Angle Camera (WAC)"
+  },
+  {
+    "id": "I7",
+    "name": "Lunar Global Mapping Camera Suite",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 12,
+    "prereqNodes": [
+      "I6"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "High-resolution lunar surface mapping from polar orbit (100 km).",
+    "heritage": "LROC Narrow Angle Camera (NAC)"
+  },
+  {
+    "id": "I8",
+    "name": "Lunar Orbiter Laser Altimeter",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 14,
+    "prereqNodes": [
+      "I7"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "5-beam pulsed laser mapping 3D lunar topography and slope hazards.",
+    "heritage": "LOLA Laser Altimeter"
+  },
+  {
+    "id": "I9",
+    "name": "Epithermal Neutron Water-Ice Detector",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 15,
+    "prereqNodes": [
+      "I6"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Discovers subsurface water-ice in polar permanently shadowed regions (PSRs).",
+    "heritage": "NASA LEND Neutron Detector"
+  },
+  {
+    "id": "I10",
+    "name": "Thermal Radiometer & Mineral Spectrometer",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 15,
+    "prereqNodes": [
+      "I7"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Maps surface composition, silicate minerals, and cryogenic cold traps.",
+    "heritage": "Diviner Lunar Radiometer (DLRE)"
+  },
+  {
+    "id": "I11",
+    "name": "Spaceborne Synthetic Aperture Radar",
+    "branch": "instruments",
+    "tier": 3,
+    "cost": 30,
+    "prereqNodes": [
+      "I4",
+      "P3"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Penetrates dense monsoon cloud cover and tropical cyclones for 24/7 imaging.",
+    "heritage": "Sentinel-1 C-Band Active Radar (SAR)"
+  },
+  {
+    "id": "I12",
+    "name": "Lunar Surface Seismometer",
+    "branch": "instruments",
+    "tier": 4,
+    "cost": 12,
+    "prereqNodes": [
+      "G2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Detects moonquakes and meteoroid surface impact shockwaves.",
+    "heritage": "Apollo / ILSA MEMS Seismometer"
+  },
+  {
+    "id": "I13",
+    "name": "Regolith Thermophysical Surface Probe",
+    "branch": "instruments",
+    "tier": 4,
+    "cost": 10,
+    "prereqNodes": [
+      "G2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_chaste_probe"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Measures vertical thermal conductivity gradients down to 10 cm in soil.",
+    "heritage": "ISRO ChaSTE Regolith Thermal Probe"
+  },
+  {
+    "id": "I14",
+    "name": "Cryogenic Regolith Core Drill",
+    "branch": "instruments",
+    "tier": 4,
+    "cost": 18,
+    "prereqNodes": [
+      "G2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Penetrates up to 1.0 m to extract pristine volatile ice samples.",
+    "heritage": "Subsurface Core Drill System"
+  },
+  {
+    "id": "I15",
+    "name": "Precision Laser Retroreflector Array",
+    "branch": "instruments",
+    "tier": 4,
+    "cost": 3,
+    "prereqNodes": [
+      "G4"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Sub-millimeter laser ranging from Earth to measure lunar orbital dynamics.",
+    "heritage": "NASA Goddard LRA Passive Array"
+  },
+  {
+    "id": "G1",
+    "name": "High-Frame-Rate Descent Camera",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 5,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Captures real-time descent imagery; returns bonus science data upon touchdown.",
+    "heritage": "Descent Optical Camera"
+  },
+  {
+    "id": "G2",
+    "name": "Dual-Band Radar Altimeter & Velocimeter",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 20,
+    "prereqNodes": [],
+    "prereqMission": null,
+    "unlocksParts": [
+      "inst_kara_landing_radar"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Mandatory for Lunar Soft Landing. Measures altitude and 3D velocity vectors.",
+    "heritage": "Chandrayaan-3 KaRA + LDV Suite"
+  },
+  {
+    "id": "G3",
+    "name": "Throttleable Lunar Descent Engine",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 25,
+    "prereqNodes": [
+      "A8"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "prop_lpsc_throttleable"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "2,400 N thrust, throttleable from 30% to 100%. Enables soft touchdown.",
+    "heritage": "ISRO LPSC 800N Cluster / Apollo DPS"
+  },
+  {
+    "id": "G4",
+    "name": "Crushable Lunar Landing Struts",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 8,
+    "prereqNodes": [
+      "G3"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [
+      "land_hex_gear"
+    ],
+    "effect": null,
+    "hackathonEnabled": true,
+    "description": "Dissipates residual vertical kinetic energy upon touchdown (up to 2.0 m/s).",
+    "heritage": "Hexagonal Shock-Absorbing Legs"
+  },
+  {
+    "id": "G5",
+    "name": "Autonomous Powered Descent Guidance",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 10,
+    "prereqNodes": [
+      "G2"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Projects fuel consumption, calculates gate turn-over, displays pre-launch landing odds.",
+    "heritage": "Guidance Algorithm Software Package"
+  },
+  {
+    "id": "G6",
+    "name": "Flash Lidar Hazard Avoidance System",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 22,
+    "prereqNodes": [
+      "G2",
+      "G5"
+    ],
+    "prereqMission": null,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Scans landing ellipse for boulders and steep slopes; adds +15% landing safety roll.",
+    "heritage": "LHDAC Real-Time Hazard Lidar"
+  },
+  {
+    "id": "G7",
+    "name": "Rocker-Bogie Lunar Micro-Rover",
+    "branch": "landing",
+    "tier": 4,
+    "cost": 25,
+    "prereqNodes": [
+      "G4",
+      "P2"
+    ],
+    "prereqMission": 7,
+    "unlocksParts": [],
+    "effect": null,
+    "hackathonEnabled": false,
+    "description": "Deploys from lander ramp; traverses surface obstacles to conduct distributed science.",
+    "heritage": "Pragyan-Class 6-Wheel Micro-Rover"
+  }
+]
