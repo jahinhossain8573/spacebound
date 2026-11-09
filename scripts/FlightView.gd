@@ -43,6 +43,10 @@ var _skip_start := 0.0
 var _skip_remaining := 0.0
 var _failure_delay := 0.0
 var _flash_clock := 0.0
+var _sunlit_pass_started := false
+var _objective_label: Label
+var _beacon_label: Label
+var _skip_beacon_at := -1.0
 var shared_launch: Control
 var _shared_rocket: Node3D
 var _shared_center := Vector3(0, -6371000.0, 0)
@@ -97,6 +101,12 @@ func _build_scene() -> void:
 	_hud = Label.new()
 	_hud.add_theme_color_override("font_color", Color("00e5ff"))
 	layout.add_child(_hud)
+	_objective_label = Label.new()
+	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	layout.add_child(_objective_label)
+	_beacon_label = Label.new()
+	_beacon_label.add_theme_color_override("font_color", Color("00e5ff"))
+	layout.add_child(_beacon_label)
 	_battery_label = Label.new()
 	layout.add_child(_battery_label)
 	_battery_bar = ProgressBar.new()
@@ -219,18 +229,18 @@ func advance_time(real_delta_s: float) -> void:
 	var elapsed := real_delta_s * warp
 	if power_active:
 		var remaining := minf(elapsed, maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s))
-		while remaining > 0.000001 and not power_failed:
-			var step := minf(5.0, remaining)
-			var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
-			orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + step * 0.5, period_s)
-			_update_position()
-			var rate := -draw_w if in_eclipse else generation_w - draw_w
-			battery_charge_wh = clampf(battery_charge_wh + rate * step / 3600.0, 0.0, battery_capacity_wh)
-			_track_battery()
-			mission_elapsed_s += step
-			orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + step * 0.5, period_s)
-			remaining -= step
-			if battery_charge_wh <= 0.0 and rate < 0.0: _power_failure("POWER FAILURE")
+		var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
+		var fraction := _eclipse_fraction()
+		var result: Dictionary = FlightSim.simulate_mission_skip(remaining, period_s, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, _sun_phase(period_s, fraction), _sunlit_pass_started)
+		var before := mission_elapsed_s
+		mission_elapsed_s += result.elapsed_s
+		orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + result.elapsed_s, period_s)
+		battery_charge_wh = result.end_wh
+		_sunlit_pass_started = result.pass_started
+		battery_lowest_pct = minf(battery_lowest_pct, result.lowest_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0)
+		GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
+		if result.sunlit_pass_completed_s >= 0.0: _award_beacon(before + result.sunlit_pass_completed_s)
+		if not result.survived: _power_failure("POWER FAILURE")
 		_update_position()
 		if not power_failed and mission_elapsed_s >= float(mission.durationDays) * 86400.0: _complete_duration()
 		return
@@ -246,7 +256,10 @@ func _process(delta: float) -> void:
 		if _failure_delay <= 0.0: _open_debrief()
 	elif not _skip_result.is_empty():
 		_skip_animation += delta
-		mission_elapsed_s = _skip_start + _skip_remaining * minf(1.0, _skip_animation / 3.0)
+		mission_elapsed_s = _skip_start + _skip_result.elapsed_s * minf(1.0, _skip_animation / 3.0)
+		if _skip_beacon_at >= 0.0 and mission_elapsed_s >= _skip_beacon_at:
+			_award_beacon(_skip_beacon_at)
+			_skip_beacon_at = -1.0
 		_update_position()
 		if _skip_animation >= 3.0:
 			battery_charge_wh = _skip_result.end_wh
@@ -255,6 +268,7 @@ func _process(delta: float) -> void:
 	else:
 		advance_time(delta)
 	_update_battery_hud()
+	_update_objectives()
 	if orbit != null:
 		_update_camera()
 		var pixels := maxf(1.0, float(_view.size.y))
@@ -376,10 +390,9 @@ func skip_mission_time() -> void:
 	# Notify event listeners before reading power totals and computing the result.
 	GameManager.mission_skip_started.emit(_skip_remaining)
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
-	var fraction: float = 72.0 / 1436.0 if mission.get("targetOrbit", "") in ["GEO", "GTO"] else FlightSim.eclipse_fraction(orbit.semi_major_axis_km)
-	# The skip helper's cycle starts at eclipse exit, with sunlight first.
-	var phase := fposmod(orbit.time_since_periapsis_s + orbit.arg_periapsis_rad / TAU * period - period * (0.5 + fraction * 0.5), period)
-	_skip_result = FlightSim.simulate_mission_skip(_skip_remaining, period, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, phase)
+	var fraction := _eclipse_fraction()
+	_skip_result = FlightSim.simulate_mission_skip(_skip_remaining, period, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, _sun_phase(period, fraction), _sunlit_pass_started)
+	if _skip_result.sunlit_pass_completed_s >= 0.0: _skip_beacon_at = _skip_start + _skip_result.sunlit_pass_completed_s
 	battery_lowest_pct = minf(battery_lowest_pct, _skip_result.lowest_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0)
 	GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
 	_skip_animation = 0.0
@@ -445,3 +458,29 @@ func activate_shared_world(view: SubViewportContainer, world: Node3D, rocket: No
 	_plotter.transform = Transform3D(Basis(Vector3.UP, Vector3.BACK, Vector3.RIGHT).scaled(Vector3.ONE * SHARED_SCALE), _shared_center)
 	_update_position()
 	_camera.global_transform = camera_transform
+
+func _eclipse_fraction() -> float:
+	return 72.0 / 1436.0 if mission.get("targetOrbit", "") in ["GEO", "GTO"] else FlightSim.eclipse_fraction(orbit.semi_major_axis_km)
+
+func _sun_phase(period: float, fraction: float) -> float:
+	return fposmod(orbit.time_since_periapsis_s + orbit.arg_periapsis_rad / TAU * period - period * (0.5 + fraction * 0.5), period)
+
+func _award_beacon(at: float) -> void:
+	for definition in mission.get("objectives", []):
+		if definition.trigger != "sunlit_pass": continue
+		var found := false
+		for part in GameManager.current_build.get("installed_components", []):
+			if part.get("id", "") == definition.requiredPartId: found = true
+		if not found: continue
+		for objective in GameManager.last_result.get("objectives", []):
+			if objective.get("id", "") == definition.id and not objective.done:
+				objective.done = true
+				_beacon_label.text = definition.message
+				GameManager.last_result.flight_log.append("T+%.1fs %s" % [at, definition.message])
+
+func _update_objectives() -> void:
+	if _objective_label == null: return
+	var lines: Array[String] = []
+	for objective in GameManager.last_result.get("objectives", []):
+		lines.append(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
+	_objective_label.text = "  |  ".join(lines)

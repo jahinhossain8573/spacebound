@@ -246,6 +246,10 @@ func _begin_ascent() -> void:
 	var m: Dictionary = GameManager.current_mission
 	var stats: Dictionary = GameManager.current_build.stats
 	GameManager.last_result = {"mission_number":int(m.missionNumber), "attempt_id":GameManager.attempt_id, "launched":false, "objectives":[{"name":"Reach starting orbit", "done":false}, {"name":"Survive mission duration", "done":false}, {"name":"Mission objective", "done":false}], "total_cost_m":stats.get("cost_millions",0.0), "mass_margin_pct":stats.get("mass_margin_pct",0.0), "events_fired":[], "flight_log":[]}
+	if m.has("objectives"):
+		GameManager.last_result.objectives = []
+		for definition in m.objectives:
+			GameManager.last_result.objectives.append({"id":definition.id, "name":definition.name, "done":false})
 	_log("Liftoff aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100])
 
 func _process(delta: float) -> void:
@@ -326,7 +330,8 @@ func _finish_success() -> void:
 	finished = true
 	_log("Orbital insertion nominal.")
 	GameManager.last_result.launched = true
-	GameManager.last_result.objectives[0].done = true
+	for objective in GameManager.last_result.objectives:
+		if objective.get("id", "") == "reach_orbit" or objective.get("name", "") == "Reach starting orbit": objective.done = true
 	GameManager.flight_elapsed_s = elapsed
 	var mission: Dictionary = GameManager.current_mission
 	var initial := OrbitState.new()

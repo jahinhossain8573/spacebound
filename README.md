@@ -54,13 +54,13 @@ Run the physics checks with `godot --headless --path . --script res://tests/test
 
 `FlightSim` provides pure rocket, orbit, burn, eclipse, and battery calculations. Orbital distances and apsis radii are in kilometres from the body's center; orbital speeds are km/s. Rocket delta-v is m/s, mass is kg, Isp and time are seconds, power is watts, and battery capacity is Wh. The tangential-burn helper assumes zero radial velocity at the burn point; unbound results contain only `escaped: true`.
 
-Mission skipping starts with a full battery at the beginning of sunlight, processes sunlight then eclipse, and truncates the final orbit to the requested duration. Reaching zero charge fails; `failed_orbit` is one-based, or -1 on survival. Orbit propagation supports ellipses (`0 <= eccentricity < 1`), with periapsis on +x; invalid elements return `Vector2.ZERO`.
+Mission skipping starts from the current battery charge and orbital phase, processes sunlight and eclipse, and truncates the final orbit to the requested duration. Reaching zero charge fails; `failed_orbit` is one-based, or -1 on survival. Orbit propagation supports ellipses (`0 <= eccentricity < 1`), with periapsis on +x; invalid elements return `Vector2.ZERO`.
 
 Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and the project startup smoke check pass.
 
 ## Workshop preview
 
-Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch remains disabled until the readiness review is implemented.
+Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch is enabled when the readiness review has no failures.
 
 Run the assembly checks with `godot --headless --path . --script res://tests/test_workshop.gd`. Workshop, data, and FlightSim headless checks pass on Godot 4.7.2. A temporary Compatibility Web export loaded in the in-app browser; adding/removing a part and keyboard camera rotation were visually checked. Native scene startup was checked, but native visual interaction, browser scrolling, and resize remain to be verified.
 
@@ -72,7 +72,7 @@ Run campaign tests with `godot --headless --path . --script res://tests/test_cam
 
 ## Readiness review
 
-Workshop telemetry updates as parts and propellant change. Run Readiness Review to see individual failures and advisories; Launch requires no failures. Until the launch scene is available, Launch saves an independent build snapshot and shows a confirmation in the Workshop.
+Workshop telemetry updates as parts and propellant change. Run Readiness Review to see individual failures and advisories; Launch requires no failures. Launch saves an independent build snapshot and opens the launch sequence.
 
 Run checks with `godot --headless --path . --script res://tests/test_readiness.gd`. The readiness, Workshop, campaign, FlightSim, and data tests pass on Godot 4.7.2. An isolated Web preview was checked for the report, Mission 1 assembly, live updates, and launch handoff. Native visual interaction and browser resize/scroll checks remain unverified.
 
@@ -80,7 +80,7 @@ Run checks with `godot --headless --path . --script res://tests/test_readiness.g
 
 ## Flight preview
 
-Run `godot --path . res://scenes/FlightView.tscn` (or F6 in the editor). It previews Mission 1 when no mission is selected. Choose 1/10/100/1000x warp and Spacecraft/Earth/Wide camera presets. Right-drag or use arrows over the viewport to rotate, and scroll or use +/- to zoom. No burns, battery simulation, or completion are implemented here.
+Run `godot --path . res://scenes/FlightView.tscn` (or F6 in the editor). It previews Mission 1 when no mission is selected. Choose 1/10/100/1000x warp and toggle between spacecraft and map views with M. Right-drag or use arrows over the viewport to rotate, and scroll or use +/- to zoom. Battery simulation and mission completion are active; orbital burns are planned separately.
 
 `GameManager.initial_orbit` accepts an `OrbitState` handoff; FlightView copies it. `FlightView.set_orbit()` validates and redraws an orbit without resetting total elapsed time. Lunar missions require their dedicated flight scenes.
 
@@ -110,3 +110,9 @@ Run `godot --headless --path . --script res://tests/test_balance.gd` for full re
 The scripted ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the rocket's position and camera framing. Right-drag and the wheel control the camera, and M switches between flight and map view. The launch remains scripted and the ascent is visually compressed to 15 seconds.
 
 `godot --headless --path . --script res://tests/test_launch.gd` checks staging, station visibility, insertion continuity, shared camera/viewport ownership, and map switching. Launch, orbit, power, and campaign checks passed. A temporary Web preview was checked from pad through orbit and back from map view; a native run reported no rendering errors.
+
+## Mission 1
+
+The reference build uses P31u panels, BP4 battery, NanoMind A3200 computer and EnduroSat UHF on the 1U/3U bus. The first signal requires a complete powered sunlit pass after eclipse exit; Skip can simulate it. A successful reference mission earns 92.5 points, $16M and 17 SP with existing bonus rules.
+
+Run `godot --headless --path . --script res://tests/test_mission1.gd`. Mission 1 and existing regression suites pass, and the release Web export succeeds. Public hosting remains deferred. The full native and browser campaign playthrough, reload, and resize checks remain to be verified.

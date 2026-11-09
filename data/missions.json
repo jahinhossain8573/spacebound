@@ -21,7 +21,26 @@
     "rewardFundsMillions": 16,
     "rewardSciencePoints": 15,
     "unlocksTier": 1,
-    "historyNote": "Electron is a gameplay choice. The real BRAC Onnesha launched on SpaceX Falcon 9 (CRS-11 cargo flight to the ISS) in June 2017 and was deployed from the ISS Kibo module in July 2017."
+    "historyNote": "Electron is a gameplay choice. The real BRAC Onnesha launched on SpaceX Falcon 9 (CRS-11 cargo flight to the ISS) in June 2017 and was deployed from the ISS Kibo module in July 2017.",
+    "objectives": [
+      {
+        "id": "reach_orbit",
+        "name": "Reach starting orbit",
+        "trigger": "launch"
+      },
+      {
+        "id": "first_signal",
+        "name": "First signal",
+        "trigger": "sunlit_pass",
+        "requiredPartId": "com_endurosat_uhf",
+        "message": "Beacon received at Betbunia ground station, Bangladesh"
+      },
+      {
+        "id": "survive_duration",
+        "name": "Survive mission duration",
+        "trigger": "duration"
+      }
+    ]
   },
   {
     "missionNumber": 2,

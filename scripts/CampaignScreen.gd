@@ -173,6 +173,9 @@ func _debrief() -> void:
 		_body.add_child(bar)
 	_label("Payout: $%.2fM and %d SP" % [receipt.funds_millions, receipt.science_points])
 	if not receipt.unlocks.is_empty(): _label("Unlocked: " + ", ".join(receipt.unlocks), null, Color("ffb300"))
+	_label("Objectives")
+	for objective in GameManager.last_result.get("objectives", []):
+		_label(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
 	_label("Flight log")
 	for line in receipt.flight_log: _label(str(line))
 	var next := _button("Continue", _return_to_missions)

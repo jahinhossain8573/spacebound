@@ -122,6 +122,12 @@ func _make_ui() -> void:
 	objective_brief.text = str(mission.get("briefing", ""))
 	objective_brief.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	objective_content.add_child(objective_brief)
+	if mission.has("historyNote"):
+		var history := Label.new()
+		history.text = "History: " + str(mission.historyNote)
+		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		history.add_theme_color_override("font_color", Color("ffb300"))
+		objective_content.add_child(history)
 	var required_names: Array[String] = []
 	for part_id in mission.get("requiredPartIds", []):
 		required_names.append(str(GlobalData.get_part(part_id).get("name", part_id)))

@@ -98,6 +98,18 @@ func _valid_record(item: Dictionary, kind: String) -> bool:
 				for value: Variant in item[field]:
 					if not value is String or value.is_empty():
 						return false
+			if item.has("objectives"):
+				if not item.objectives is Array or item.objectives.is_empty(): return false
+				var objective_ids := {}
+				for objective in item.objectives:
+					if not objective is Dictionary: return false
+					for key in ["id", "name", "trigger"]:
+						if not objective.get(key) is String or objective[key].is_empty(): return false
+					if objective.id in objective_ids or objective.trigger not in ["launch", "sunlit_pass", "duration"]: return false
+					objective_ids[objective.id] = true
+					if objective.trigger == "sunlit_pass":
+						for key in ["requiredPartId", "message"]:
+							if not objective.get(key) is String or objective[key].is_empty(): return false
 			if item.has("unlocksTier") and (not _is_number(item.unlocksTier) or item.unlocksTier < 0 or item.unlocksTier > 4 or item.unlocksTier != floor(item.unlocksTier)):
 				return false
 		_:

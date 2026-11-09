@@ -105,16 +105,17 @@ func position_on_orbit_km(semi_major_axis_km: float, eccentricity: float, time_s
 
 ## Starts with a full battery at the start of sunlight; failure orbit is one-based.
 ## The last orbit is truncated to duration_s. Reaching zero charge is failure.
-func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fraction: float, gen_w: float, draw_w: float, battery_wh: float, start_wh: float = -1.0, phase_s: float = 0.0) -> Dictionary:
+func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fraction: float, gen_w: float, draw_w: float, battery_wh: float, start_wh: float = -1.0, phase_s: float = 0.0, pass_started: bool = false) -> Dictionary:
 	var capacity := maxf(0.0, battery_wh)
 	var charge := capacity if start_wh < 0.0 else clampf(start_wh, 0.0, capacity)
 	var lowest := charge
 	if not is_finite(duration_s) or not is_finite(orbit_period_s) or orbit_period_s <= 0.0:
-		return {"survived":false, "lowest_wh":0.0, "end_wh":charge, "failed_orbit":1}
+		return {"survived":false, "lowest_wh":0.0, "end_wh":charge, "failed_orbit":1, "elapsed_s":0.0, "sunlit_pass_completed_s":-1.0, "pass_started":false}
 	var remaining := maxf(0.0, duration_s)
 	var sun_end := orbit_period_s * (1.0 - clampf(eclipse_fraction, 0.0, 1.0))
 	var phase := fposmod(phase_s, orbit_period_s)
 	var elapsed := 0.0
+	var pass_completed := -1.0
 	while remaining > 0.000001:
 		var sunlight := phase < sun_end
 		var boundary := sun_end if sunlight else orbit_period_s
@@ -123,9 +124,16 @@ func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fra
 		var next := clampf(charge + rate * step / 3600.0, 0.0, capacity)
 		lowest = minf(lowest, next)
 		if next <= 0.0 and rate < 0.0:
-			return {"survived":false, "lowest_wh":0.0, "end_wh":0.0, "failed_orbit":int(elapsed / orbit_period_s) + 1}
+			var failed_at := elapsed + (charge * 3600.0 / -rate)
+			return {"survived":false, "lowest_wh":0.0, "end_wh":0.0, "failed_orbit":int(failed_at / orbit_period_s) + 1, "elapsed_s":failed_at, "sunlit_pass_completed_s":pass_completed, "pass_started":false}
 		charge = next
 		remaining -= step
 		elapsed += step
+		var reached_boundary := step >= boundary - phase - 0.000001
+		if reached_boundary and sunlight:
+			if pass_started and charge > 0.0 and pass_completed < 0.0: pass_completed = elapsed
+			pass_started = false
+		elif reached_boundary:
+			pass_started = charge > 0.0
 		phase = fposmod(phase + step, orbit_period_s)
-	return {"survived":true, "lowest_wh":lowest, "end_wh":charge, "failed_orbit":-1}
+	return {"survived":true, "lowest_wh":lowest, "end_wh":charge, "failed_orbit":-1, "elapsed_s":elapsed, "sunlit_pass_completed_s":pass_completed, "pass_started":pass_started}
