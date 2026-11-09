@@ -98,3 +98,9 @@ FlightView now charges batteries in sunlight and drains them in eclipse, includi
 Skip mission time starts from the current charge and orbital phase, emits `GameManager.mission_skip_started(remaining_s)` before calculation, and animates the clock and minimum battery display over three seconds. Mission 4 requires circular GEO before skip is enabled; its maneuver implementation remains a later issue. The helper accepts optional `start_wh` and sunlight-first `phase_s` arguments while preserving existing callers. Minimum battery percentage is passed to campaign scoring.
 
 Run `godot --headless --path . --script res://tests/test_power.gd`. All 16 power checks and existing data, physics, Workshop, readiness, campaign, orbit, and launch suites pass. A temporary Web Mission 1 fixture verified the battery HUD, skip animation, Debrief, payout, and Tier 1 unlock. Native visual interaction, low-battery flashing, and failure presentation remain manually unverified. Alarm audio and event effects belong to later issues.
+
+## Fuel balance
+
+The fuel slider covers the build's remaining allowance, accounting for bus volume, propellant density and ullage, tank and adapter mass, the 10% launch margin, and mission budget. The numeric control still accepts larger amounts for experimentation; the allowance message explains overloads. Missions 1–3 require no spacecraft fuel because their launchers provide the starting orbit.
+
+Run `godot --headless --path . --script res://tests/test_balance.gd` for full readiness checks using parts available at each mission's tier. Example passing fuel amounts are 0.5 kg (optional Mission 1 cold gas), 0 kg (Missions 2–3), 394.694 kg (Mission 4), 0.793 kg (Mission 5), and 840.082 kg (Mission 7). The test lists the complete part combinations. No catalog masses or launcher capacities were changed. Balance, Workshop, readiness and physics checks passed; the revised slider has not been visually checked.

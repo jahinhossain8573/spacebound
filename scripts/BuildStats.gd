@@ -78,3 +78,16 @@ func run_readiness_review(build: Dictionary, mission: Dictionary) -> Array[Dicti
 
 func _add(checks: Array[Dictionary], name: String, status: String, message: String) -> void:
 	checks.append({"check": name, "status": status, "message": message})
+
+## Fuel headroom after allowing for tanks, adapter, ullage and the launch margin.
+func propellant_limits(build: Dictionary, mission: Dictionary) -> Dictionary:
+	var empty := build.duplicate()
+	empty["propellant_mass_kg"] = 0.0
+	var s := calculate_stats(empty, mission)
+	var density: float = FlightSim.PROPELLANT_DENSITY_KG_L.get(s.engine.get("propellantType", ""), 0.0)
+	var mass_limit: float = maxf(0.0, (s.launcher_capacity_kg * 0.9 - s.wet_mass_kg) / (1.0 + FlightSim.TANK_MASS_RATIO * (1.0 + FlightSim.ADAPTER_MASS_RATIO)))
+	var volume_limit: float = maxf(0.0, s.volume_capacity_liters - s.internal_volume_liters) * density / (1.0 + FlightSim.ULLAGE_MARGIN)
+	var budget_limit: float = maxf(0.0, s.budget_millions - s.cost_millions) / FlightSim.PROPELLANT_COST_PER_KG_M
+	var maximum := minf(mass_limit, minf(volume_limit, budget_limit)) if not s.engine.is_empty() else 0.0
+	var reason := "space inside the bus" if volume_limit <= mass_limit and volume_limit <= budget_limit else ("launcher mass margin" if mass_limit <= budget_limit else "mission budget")
+	return {"maximum_kg":maximum, "limiting_factor":reason, "mass_kg":mass_limit, "volume_kg":volume_limit, "budget_kg":budget_limit}

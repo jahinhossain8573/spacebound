@@ -15,6 +15,7 @@ var _installed_container: VBoxContainer
 var _fuel_box: VBoxContainer
 var _slider: HSlider
 var _spin: SpinBox
+var _fuel_hint: Label
 var _message: Label
 var _viewport_container: SubViewportContainer
 var _craft: Node3D
@@ -133,6 +134,9 @@ func _make_ui() -> void:
 	_spin.allow_greater = true
 	_spin.value_changed.connect(set_propellant_mass)
 	_fuel_box.add_child(_spin)
+	_fuel_hint = Label.new()
+	_fuel_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_fuel_box.add_child(_fuel_hint)
 	var fill := Button.new()
 	fill.text = "Fill to required Δv + 10%"
 	fill.pressed.connect(fill_to_required_delta_v)
@@ -290,11 +294,22 @@ func set_propellant_mass(kg: float) -> void:
 	build_changed.emit()
 
 func _sync_fuel() -> void:
-	var upper := maxf(100.0, maxf(float(bus.internalVolumeLiters) * 1.2, propellant_mass_kg * 1.25))
+	var limits: Dictionary = _stats_helper.propellant_limits(_build_data(), mission)
+	# The slider covers usable headroom; the spin box still permits deliberate overloads.
+	var upper := maxf(0.001, maxf(floorf(limits.maximum_kg * 1000.0) / 1000.0, propellant_mass_kg))
+	_slider.set_block_signals(true)
+	_spin.set_block_signals(true)
 	_slider.max_value = upper
-	_spin.max_value = upper
-	_slider.set_value_no_signal(propellant_mass_kg)
-	_spin.set_value_no_signal(propellant_mass_kg)
+	_spin.max_value = maxf(100.0, upper)
+	_slider.value = propellant_mass_kg
+	_spin.value = propellant_mass_kg
+	_slider.set_block_signals(false)
+	_spin.set_block_signals(false)
+	_fuel_hint.text = "Fuel allowance: %.3f kg, limited by %s." % [limits.maximum_kg, limits.limiting_factor]
+	if float(mission.get("requiredDeltaVMps", 0.0)) <= 0.0:
+		_fuel_hint.text += " This mission needs no propulsion; its launcher supplies the orbit."
+	if propellant_mass_kg > limits.maximum_kg + 0.000001:
+		_fuel_hint.text += " Current fuel exceeds this allowance. Reduce fuel or remove parts."
 
 func fill_to_required_delta_v() -> void:
 	var engine := _engine()
