@@ -18,7 +18,12 @@ var _error: Label
 var _yaw := 0.55
 var _pitch := 0.65
 var _distance := 190.0
-var _camera_mode := "Earth"
+var _camera_mode := "Spacecraft"
+var _map_view := false
+var _ship_camera := Vector3(0.55, 0.65, 0.18)
+var _map_camera := Vector3(0.55, 0.65, 190.0)
+var _craft_visual: Node3D
+var _map_button: Button
 var _dragging := false
 var battery_capacity_wh := 0.0
 var battery_charge_wh := 0.0
@@ -61,6 +66,15 @@ func _ready() -> void:
 				return
 		set_orbit(initial)
 	_initialize_power()
+	if GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
+		var fade := ColorRect.new()
+		fade.color = Color.BLACK
+		fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(fade)
+		var tween := create_tween()
+		tween.tween_property(fade, "modulate:a", 0.0, 1.0)
+		tween.tween_callback(fade.queue_free)
 
 func _build_scene() -> void:
 	var layout := VBoxContainer.new()
@@ -71,8 +85,10 @@ func _build_scene() -> void:
 	_add_button(buttons, "< Back", func(): get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn"))
 	for level in WARP_LEVELS:
 		_add_button(buttons, "%dx" % level, set_warp.bind(level))
-	for preset in ["Spacecraft", "Earth", "Wide"]:
-		_add_button(buttons, preset, set_camera_preset.bind(preset))
+	_map_button = Button.new()
+	_map_button.text = "Map view (M)"
+	_map_button.pressed.connect(toggle_map_view)
+	buttons.add_child(_map_button)
 	_add_button(buttons, "Reset view", _reset_view)
 	_hud = Label.new()
 	_hud.add_theme_color_override("font_color", Color("00e5ff"))
@@ -136,6 +152,26 @@ func _build_scene() -> void:
 	_marker.material_override = cyan
 	_marker.visible = false
 	world.add_child(_marker)
+	_craft_visual = Node3D.new()
+	world.add_child(_craft_visual)
+	var craft := MeshInstance3D.new()
+	var body := BoxMesh.new()
+	body.size = Vector3(0.03, 0.03, 0.03)
+	craft.mesh = body
+	var white := StandardMaterial3D.new()
+	white.albedo_color = Color("d7e2ed")
+	craft.material_override = white
+	_craft_visual.add_child(craft)
+	for side in [-1, 1]:
+		var wing := MeshInstance3D.new()
+		var panel := BoxMesh.new()
+		panel.size = Vector3(0.04, 0.018, 0.002)
+		wing.mesh = panel
+		wing.position.x = side * 0.035
+		var solar := StandardMaterial3D.new()
+		solar.albedo_color = Color("235899")
+		wing.material_override = solar
+		_craft_visual.add_child(wing)
 	_camera = Camera3D.new()
 	_camera.current = true
 	_camera.far = 10000.0
@@ -218,7 +254,10 @@ func _process(delta: float) -> void:
 		_update_camera()
 		var pixels := maxf(1.0, float(_view.size.y))
 		var diameter := 8.0 * 2.0 * _camera.global_position.distance_to(_marker.global_position) * tan(deg_to_rad(_camera.fov) * 0.5) / pixels
-		_marker.scale = Vector3.ONE * maxf(0.5, diameter)
+		_marker.scale = Vector3.ONE * maxf(0.5, diameter) if _map_view else Vector3.ONE
+		_marker.visible = _map_view
+		_craft_visual.visible = not _map_view
+		_craft_visual.position = _marker.position
 
 func _update_position() -> void:
 	var pos: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s, orbit.mu)
@@ -236,10 +275,28 @@ func _update_position() -> void:
 func is_in_eclipse(pos_km: Vector2) -> bool:
 	return pos_km.x < 0.0 and absf(pos_km.y) < FlightSim.R_EARTH_KM
 
+func toggle_map_view() -> void:
+	if orbit == null: return
+	if _map_view:
+		_map_camera = Vector3(_yaw, _pitch, _distance)
+		_yaw = _ship_camera.x
+		_pitch = _ship_camera.y
+		_distance = _ship_camera.z
+		_camera_mode = "Spacecraft"
+	else:
+		_ship_camera = Vector3(_yaw, _pitch, _distance)
+		_yaw = _map_camera.x
+		_pitch = _map_camera.y
+		_distance = _map_camera.z
+		_camera_mode = "Earth"
+	_map_view = not _map_view
+	_map_button.text = "Flight view (M)" if _map_view else "Map view (M)"
+	_update_camera()
+
 func set_camera_preset(value: String) -> void:
 	if orbit == null: return
 	_camera_mode = value
-	_distance = 20.0 if value == "Spacecraft" else 190.0
+	_distance = 0.18 if value == "Spacecraft" else 190.0
 	if value == "Wide":
 		_distance = maxf(190.0, orbit.semi_major_axis_km * (1.0 + orbit.eccentricity) * FlightSim.RENDER_SCALE * 3.2)
 	_update_camera()
@@ -259,7 +316,7 @@ func _view_input(event: InputEvent) -> void:
 		if event.pressed: _view.grab_focus()
 		if event.button_index == MOUSE_BUTTON_RIGHT: _dragging = event.pressed
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.0, 5000.0)
+			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 0.06, 5000.0)
 	elif event is InputEventMouseMotion and _dragging:
 		_yaw -= event.relative.x * 0.01
 		_pitch = clampf(_pitch + event.relative.y * 0.01, -1.4, 1.4)
@@ -269,10 +326,11 @@ func _view_input(event: InputEvent) -> void:
 			KEY_RIGHT: _yaw += 0.1
 			KEY_UP: _pitch = maxf(-1.4, _pitch - 0.1)
 			KEY_DOWN: _pitch = minf(1.4, _pitch + 0.1)
-			KEY_EQUAL, KEY_PLUS, KEY_KP_ADD: _distance = maxf(2.0, _distance * 0.9)
+			KEY_EQUAL, KEY_PLUS, KEY_KP_ADD: _distance = maxf(0.06, _distance * 0.9)
 			KEY_MINUS, KEY_KP_SUBTRACT: _distance = minf(5000.0, _distance * 1.1)
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M: toggle_map_view()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _dragging = false
 
 func _initialize_power() -> void:

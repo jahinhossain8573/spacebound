@@ -18,6 +18,13 @@ func run_tests() -> void:
 	check(flight.orbit != source and flight.orbit.semi_major_axis_km == 6771.0, "handoff copied")
 	check(flight._plotter.vertices.size() == 121 and flight._plotter.vertices[0].distance_to(flight._plotter.vertices[120]) < 0.001, "closed orbit line")
 	check(flight._plotter.material_override.vertex_color_use_as_albedo and flight._plotter.material_override.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED, "orbit material")
+	check(not flight._map_view and flight._camera_mode == "Spacecraft", "flight starts focused on spacecraft")
+	flight._yaw = 1.1
+	flight._distance = 0.25
+	flight.toggle_map_view()
+	check(flight._map_view and flight._camera_mode == "Earth", "map view toggle")
+	flight.toggle_map_view()
+	check(not flight._map_view and is_equal_approx(flight._yaw, 1.1) and is_equal_approx(flight._distance, 0.25), "flight camera restored")
 	var period: float = sim.orbital_period_s(6771.0)
 	flight.set_warp(1000)
 	flight.advance_time(period / 1000.0)

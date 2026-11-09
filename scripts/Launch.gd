@@ -26,6 +26,11 @@ var _start: Button
 var _warning: Label
 var _save_retry: Button
 var _failure_timer := 0.0
+var _camera_yaw := 0.44
+var _camera_pitch := 0.13
+var _camera_distance := 1.9
+var _camera_dragging := false
+var _launch_view: SubViewportContainer
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.LAUNCH
@@ -88,6 +93,9 @@ func _create_ui() -> void:
 	_save_retry.pressed.connect(_retry_save)
 	layout.add_child(_save_retry)
 	var container := SubViewportContainer.new()
+	_launch_view = container
+	container.focus_mode = Control.FOCUS_ALL
+	container.gui_input.connect(_camera_input)
 	container.stretch = true
 	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(container)
@@ -320,8 +328,22 @@ func _log(message: String, at: float = -1.0) -> void:
 
 func _update_camera() -> void:
 	var target := _rocket.position + Vector3(0,rocket_height*0.5,0)
-	_camera.position = target + Vector3(rocket_height*0.8,rocket_height*0.25,rocket_height*1.7)
+	_camera.position = target + Vector3(sin(_camera_yaw)*cos(_camera_pitch), sin(_camera_pitch), cos(_camera_yaw)*cos(_camera_pitch)) * rocket_height * _camera_distance
 	_camera.look_at(target,Vector3.UP)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE: ignite()
+
+func _camera_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.pressed: _launch_view.grab_focus()
+		if event.button_index == MOUSE_BUTTON_RIGHT: _camera_dragging = event.pressed
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP: _camera_distance = maxf(0.35, _camera_distance * 0.9)
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN: _camera_distance = minf(8.0, _camera_distance * 1.1)
+	elif event is InputEventMouseMotion and _camera_dragging:
+		_camera_yaw -= event.relative.x * 0.01
+		_camera_pitch = clampf(_camera_pitch + event.relative.y * 0.01, -1.4, 1.4)
+	if _camera != null: _update_camera()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _camera_dragging = false
