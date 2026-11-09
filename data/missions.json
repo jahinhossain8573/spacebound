@@ -46,7 +46,7 @@
     "missionNumber": 2,
     "id": "mission_2",
     "title": "Orbital Sentinel",
-    "briefing": "Build an imaging CubeSat and operate it for 30 days. Balance the camera and radio power demands.",
+    "briefing": "Bangladesh's agencies need regular imagery of the Bay of Bengal coastline. Fly a 12U CubeSat with a camera and fast S-band radio, and keep it pointed for 30 days.",
     "targetOrbit": "LEO",
     "targetAltitudeKm": 500,
     "durationDays": 30,
@@ -63,7 +63,31 @@
     "requiredDeltaVMps": 0,
     "budgetCapMillions": 16,
     "rewardFundsMillions": 28,
-    "rewardSciencePoints": 30
+    "rewardSciencePoints": 30,
+    "objectives": [
+      {
+        "id": "reach_orbit",
+        "name": "Reach starting orbit",
+        "trigger": "launch"
+      },
+      {
+        "id": "imaging",
+        "name": "Capture 100 images",
+        "trigger": "imaging",
+        "targetImages": 100
+      },
+      {
+        "id": "downlink",
+        "name": "Establish S-band downlink",
+        "trigger": "downlink",
+        "minimumDataRateKbps": 1000
+      },
+      {
+        "id": "survive_duration",
+        "name": "Survive mission duration",
+        "trigger": "duration"
+      }
+    ]
   },
   {
     "missionNumber": 3,

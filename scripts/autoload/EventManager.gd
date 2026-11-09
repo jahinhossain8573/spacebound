@@ -169,8 +169,11 @@ func _choose(choice: String) -> void:
 				flight._power_failure("SPACECRAFT LOST: DEBRIS IMPACT")
 			else: message = "Conjunction passed without damage."
 		"E9":
+			GameManager.last_result["optical_blocked_until_s"] = flight.mission_elapsed_s + 7.0 * 86400.0
 			if _remaining_s < 7.0 * 86400.0:
 				GameManager.last_result["optical_objective_blocked"] = true
+				for objective in GameManager.last_result.get("objectives", []):
+					if objective.get("id", "") == "imaging": objective.done = false
 				message = "Clouds persist beyond the mission. The imaging objective cannot be completed."
 			else:
 				GameManager.last_result["optical_science_penalty"] = true

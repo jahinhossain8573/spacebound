@@ -181,6 +181,7 @@ func _debrief() -> void:
 	_label("Objectives")
 	for objective in GameManager.last_result.get("objectives", []):
 		_label(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
+	if receipt.has("images_captured"): _label("Images captured: %d" % receipt.images_captured)
 	_label("Flight log")
 	for line in receipt.flight_log: _label(str(line))
 	for event_id in receipt.get("events_fired", []):

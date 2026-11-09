@@ -71,7 +71,17 @@ func run_readiness_review(build: Dictionary, mission: Dictionary) -> Array[Dicti
 	var dv_advisory: bool = not dv_fail and mission.get("requiredDeltaVMps", 0.0) > 0 and s.delta_v_mps > float(mission.requiredDeltaVMps) * 1.5
 	_add(checks, "Delta-v", "FAIL" if dv_fail else ("ADVISORY" if dv_advisory else "PASS"), "Delta-v %.1f / %.1f m/s including margin. Add an engine or fuel if needed." % [s.delta_v_mps, s.delta_v_target_mps])
 	for id in mission.get("requiredPartIds", []):
-		_add(checks, "Required part", "PASS" if id in ids else "FAIL", "Required part %s: %s" % [id, "installed" if id in ids else "install this part"])
+		var part: Dictionary = GlobalData.get_part(id)
+		var part_name: String = str(part.get("name", id))
+		var message := "Required part installed: " + part_name
+		if id not in ids:
+			message = "Missing required part: " + part_name
+			if not GameManager.is_part_unlocked(id):
+				for node in GlobalData.tech_nodes:
+					if id in node.unlocksParts and node.hackathonEnabled:
+						message += " (research %s in the tech tree)" % node.id
+						break
+		_add(checks, "Required part", "PASS" if id in ids else "FAIL", message)
 	_add(checks, "Budget", "PASS" if s.cost_millions <= s.budget_millions else "FAIL", "Cost $%.2fM / $%.2fM. Remove parts or fuel if over budget." % [s.cost_millions, s.budget_millions])
 	if int(mission.get("missionNumber", 0)) == 7:
 		_add(checks, "Lunar landing", "PASS" if s.landing_burn_possible and s.landing_twr >= 1.3 else "FAIL", "Landing TWR %.2f; requires 1.30 and fuel for the 2,600 m/s approach." % s.landing_twr)

@@ -204,6 +204,7 @@ func finalize_mission(result: Dictionary) -> Dictionary:
 	receipt["attempt_id"] = id
 	receipt["flight_log"] = result.get("flight_log", []).duplicate()
 	receipt["events_fired"] = result.get("events_fired", []).duplicate()
+	if result.has("images_captured"): receipt["images_captured"] = result.images_captured
 	receipt["unlocks"] = []
 	funds_millions += receipt.funds_millions
 	science_points += receipt.science_points

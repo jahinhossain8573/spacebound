@@ -1,6 +1,7 @@
 extends Control
 
 const ASCENT_SECONDS := 15.0
+const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 var rng := RandomNumberGenerator.new()
 var countdown := 10.0
 var elapsed := 0.0
@@ -331,7 +332,7 @@ func _finish_success() -> void:
 	_log("Orbital insertion nominal.")
 	GameManager.last_result.launched = true
 	for objective in GameManager.last_result.objectives:
-		if objective.get("id", "") == "reach_orbit" or objective.get("name", "") == "Reach starting orbit": objective.done = true
+		if objective.get("id", "") == "reach_orbit" or objective.get("name", "") == "Reach starting orbit": objective.done = MISSION_OBJECTIVES.reach_orbit(true)
 	GameManager.flight_elapsed_s = elapsed
 	var mission: Dictionary = GameManager.current_mission
 	var initial := OrbitState.new()

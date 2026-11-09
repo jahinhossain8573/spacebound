@@ -1,5 +1,6 @@
 extends Control
 
+const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
 var mission: Dictionary = {}
@@ -47,6 +48,11 @@ var _sunlit_pass_started := false
 var _objective_label: Label
 var _beacon_label: Label
 var _skip_beacon_at := -1.0
+var images_captured := 0
+var _images_label: Label
+var _skip_image_first_s := -1.0
+var _skip_image_period_s := 0.0
+var _skip_image_base := 0
 var _extension_checked := false
 var _wait_target := -1.0
 var _burn_panel: VBoxContainer
@@ -78,6 +84,7 @@ func _ready() -> void:
 				return
 		set_orbit(initial)
 	_initialize_power()
+	_update_mission_objectives()
 	_burn_panel = load("res://scenes/ui/BurnPanel.tscn").instantiate()
 	_view.get_parent().add_child(_burn_panel)
 	_view.get_parent().move_child(_burn_panel, _view.get_index())
@@ -114,6 +121,9 @@ func _build_scene() -> void:
 	_objective_label = Label.new()
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layout.add_child(_objective_label)
+	_images_label = Label.new()
+	_images_label.visible = false
+	layout.add_child(_images_label)
 	_beacon_label = Label.new()
 	_beacon_label.add_theme_color_override("font_color", Color("00e5ff"))
 	layout.add_child(_beacon_label)
@@ -259,7 +269,9 @@ func advance_time(real_delta_s: float) -> void:
 		_sunlit_pass_started = result.pass_started
 		battery_lowest_pct = minf(battery_lowest_pct, result.lowest_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0)
 		GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
-		if result.sunlit_pass_completed_s >= 0.0: _award_beacon(before + result.sunlit_pass_completed_s)
+		if result.sunlit_pass_completed_s >= 0.0:
+			_award_beacon(before + result.sunlit_pass_completed_s)
+			_apply_image_passes(images_captured, before + result.sunlit_pass_completed_s, mission_elapsed_s, period_s)
 		if not result.survived: _power_failure("POWER FAILURE")
 		_update_position()
 		if not power_failed and mission_elapsed_s >= float(mission.durationDays) * 86400.0: _complete_duration()
@@ -278,6 +290,8 @@ func _process(delta: float) -> void:
 	elif not _skip_result.is_empty():
 		_skip_animation += delta
 		mission_elapsed_s = _skip_start + _skip_result.elapsed_s * minf(1.0, _skip_animation / 3.0)
+		if _skip_image_first_s >= 0.0:
+			_apply_image_passes(_skip_image_base, _skip_image_first_s, mission_elapsed_s, _skip_image_period_s)
 		if _skip_beacon_at >= 0.0 and mission_elapsed_s >= _skip_beacon_at:
 			_award_beacon(_skip_beacon_at)
 			_skip_beacon_at = -1.0
@@ -402,7 +416,7 @@ func _track_battery() -> void:
 func can_skip_mission() -> bool:
 	if not power_active or power_failed or mission_finished or orbit == null or _skip_pending or not _skip_result.is_empty(): return false
 	if mission.get("targetOrbit", "") in ["GEO", "GTO"]:
-		return orbit.eccentricity < 0.01 and absf(orbit.semi_major_axis_km - 42164.0) < 422.0
+		return MISSION_OBJECTIVES.circularize(orbit, 42164.0)
 	return mission.get("targetOrbit", "") in ["LEO", "SSO"]
 
 func skip_mission_time() -> void:
@@ -422,7 +436,11 @@ func _continue_skip() -> void:
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 	var fraction := _eclipse_fraction()
 	_skip_result = FlightSim.simulate_mission_skip(_skip_remaining, period, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, _sun_phase(period, fraction), _sunlit_pass_started)
-	if _skip_result.sunlit_pass_completed_s >= 0.0: _skip_beacon_at = _skip_start + _skip_result.sunlit_pass_completed_s
+	if _skip_result.sunlit_pass_completed_s >= 0.0:
+		_skip_beacon_at = _skip_start + _skip_result.sunlit_pass_completed_s
+		_skip_image_first_s = _skip_beacon_at
+		_skip_image_period_s = period
+		_skip_image_base = images_captured
 	battery_lowest_pct = minf(battery_lowest_pct, _skip_result.lowest_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0)
 	GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
 	_skip_animation = 0.0
@@ -461,8 +479,9 @@ func _complete_duration() -> void:
 			EventManager.queue_finished.connect(_complete_duration, CONNECT_ONE_SHOT)
 			return
 	mission_finished = true
-	_set_objective("Survive mission duration", true)
+	_set_objective("Survive mission duration", MISSION_OBJECTIVES.survive(true))
 	if not GameManager.last_result.get("optical_objective_blocked", false): _set_objective("Mission objective", true)
+	_update_mission_objectives()
 	GameManager.last_result.flight_log.append("T+%.1fs Mission duration completed" % mission_elapsed_s)
 	_open_debrief()
 
@@ -529,3 +548,28 @@ func wait_for_apsis(apoapsis: bool) -> void:
 
 func _exit_tree() -> void:
 	EventManager.unregister_flight(self)
+
+func _update_mission_objectives() -> void:
+	if not power_active: return
+	var parts: Array = GameManager.current_build.get("installed_components", [])
+	for definition in mission.get("objectives", []):
+		for objective in GameManager.last_result.get("objectives", []):
+			if objective.get("id", "") != definition.id: continue
+			match definition.trigger:
+				"downlink":
+					objective.done = MISSION_OBJECTIVES.reach_orbit(GameManager.last_result.get("launched", false)) and MISSION_OBJECTIVES.downlink(parts, float(definition.minimumDataRateKbps))
+				"imaging":
+					if not GameManager.last_result.has("images_captured"): GameManager.last_result["images_captured"] = images_captured
+					_images_label.visible = true
+					_images_label.text = "Images captured: %d / %d" % [images_captured, int(definition.targetImages)]
+					objective.done = MISSION_OBJECTIVES.imaging(parts) and images_captured >= int(definition.targetImages) and not GameManager.last_result.get("optical_objective_blocked", false)
+
+func _apply_image_passes(base: int, first_s: float, until_s: float, period_s: float) -> void:
+	var has_imaging := false
+	for definition in mission.get("objectives", []):
+		if definition.trigger == "imaging": has_imaging = true
+	if not has_imaging or not MISSION_OBJECTIVES.imaging(GameManager.current_build.get("installed_components", [])): return
+	var blocked_until := float(GameManager.last_result.get("optical_blocked_until_s", 0.0))
+	images_captured = base + MISSION_OBJECTIVES.count_passes(first_s, period_s, until_s, blocked_until)
+	GameManager.last_result["images_captured"] = images_captured
+	_update_mission_objectives()

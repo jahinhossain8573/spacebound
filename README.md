@@ -134,3 +134,9 @@ Open Research from Mission Select to spend Science Points on parts and effects. 
 Six events can occur on orbit arrival, mission-time Skip, or a burn. Event popups pause flight until their outcome is acknowledged; events fire at most once per flight and their historical precedents appear in Debrief. Mission 3 always encounters the cloud event when an optical instrument is installed. Avoidance consumes 10 m/s, and engine underperformance preserves fuel use while correcting the achieved orbit. Mission extension adds 20% of base SP as well as its normal bonus; replay SP remains fixed at 25% of base.
 
 In debug builds, F9 can set an event RNG seed and force an unused event by ID. Run `godot --headless --path . --script res://tests/test_events.gd` for seeded outcome, pause, skip, fuel, radiation, extension, and save checks. All existing suites and a release Web export pass. An isolated browser preview verified the Mission 3 popup, resumed Skip, and Debrief precedent; the other event popups and native interaction have not been visually checked. Public hosting remains deferred.
+
+## Mission 2
+
+Orbital Sentinel requires a NanoCam, S-band radio, battery, and the RW-0.03 reaction wheels researched through A1. A deployable array supplies the reference build's 15.5 W load. Its four objectives cover orbit, 100 images, downlink, and 30-day survival. Images accrue once per completed sunlit pass when an optical instrument and active-pointing ADCS are installed; Skip updates the count during its animation. Cloud events block imaging during their seven-day window, and the final image total appears in Debrief and the saved receipt.
+
+Run `godot --headless --path . --script res://tests/test_mission2.gd`. Mission 2 and all existing suites pass, and the release Web export succeeds. An isolated browser preview with random events disabled showed 456 images, four completed objectives, Debrief, and Mission 3 availability. Public hosting remains deferred.
