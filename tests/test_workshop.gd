@@ -43,6 +43,19 @@ func run_tests() -> void:
 	check(changes == before, "no signal for unchanged values")
 	workshop.queue_free()
 	await process_frame
+	workshop = scene.instantiate()
+	root.add_child(workshop)
+	workshop.add_part("com_endurosat_uhf")
+	workshop.add_part("pwr_gomspace_p31u")
+	workshop.add_part("av_gomspace_a3200")
+	workshop.add_part("pwr_gomspace_p31u")
+	var rows: Array[Node] = workshop._installed_container.get_children()
+	check(rows[0].text == "POWER" and rows[3].text == "AVIONICS" and rows[5].text == "COMMS", "installed parts grouped in catalog order")
+	rows[1].get_child(1).pressed.emit()
+	check(workshop.installed_components.size() == 3 and workshop.installed_components[0].id == "com_endurosat_uhf" and workshop.installed_components[1].id == "av_gomspace_a3200" and workshop.installed_components[2].id == "pwr_gomspace_p31u", "grouped remove selects correct duplicate")
+	check(workshop._visuals.size() == 3, "visual associations rebuilt after grouped removal")
+	workshop.queue_free()
+	await process_frame
 	for entry in [[4, "prop_aerojet_r4d15"], [7, "prop_lpsc_throttleable"]]:
 		manager.current_mission = data.get_mission(entry[0])
 		manager.unlocked_part_ids.clear()

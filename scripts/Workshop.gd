@@ -365,24 +365,40 @@ func fill_to_required_delta_v() -> void:
 
 func _refresh_build() -> void:
 	for child in _installed_container.get_children():
+		_installed_container.remove_child(child)
 		child.queue_free()
+	var categories: Array[String] = []
+	categories.assign(CATEGORIES)
+	for part in installed_components:
+		var subsystem: String = part.get("subsystem", "other")
+		if subsystem not in categories: categories.append(subsystem)
+	for category in categories:
+		var indices: Array[int] = []
+		for i in installed_components.size():
+			if installed_components[i].get("subsystem", "other") == category: indices.append(i)
+		if indices.is_empty(): continue
+		var heading := Label.new()
+		heading.text = category.to_upper().replace("_", " ")
+		heading.add_theme_color_override("font_color", Color("00e5ff"))
+		_installed_container.add_child(heading)
+		for index in indices:
+			var row := HBoxContainer.new()
+			_installed_container.add_child(row)
+			var label := Label.new()
+			label.text = installed_components[index].name
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(label)
+			var remove := Button.new()
+			remove.text = "Remove"
+			remove.pressed.connect(remove_part.bind(index))
+			row.add_child(remove)
 	for child in _attachments.get_children():
 		child.queue_free()
 	_visuals.clear()
 	var wing := 0
 	for i in installed_components.size():
 		var part := installed_components[i]
-		var row := HBoxContainer.new()
-		_installed_container.add_child(row)
-		var label := Label.new()
-		label.text = part.name
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var remove := Button.new()
-		remove.text = "Remove"
-		remove.pressed.connect(remove_part.bind(i))
-		row.add_child(remove)
 		var visual := Node3D.new()
 		visual.name = "Part%d" % i
 		_attachments.add_child(visual)
