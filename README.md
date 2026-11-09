@@ -104,3 +104,9 @@ Run `godot --headless --path . --script res://tests/test_power.gd`. All 16 power
 The fuel slider covers the build's remaining allowance, accounting for bus volume, propellant density and ullage, tank and adapter mass, the 10% launch margin, and mission budget. The numeric control still accepts larger amounts for experimentation; the allowance message explains overloads. Missions 1–3 require no spacecraft fuel because their launchers provide the starting orbit.
 
 Run `godot --headless --path . --script res://tests/test_balance.gd` for full readiness checks using parts available at each mission's tier. Example passing fuel amounts are 0.5 kg (optional Mission 1 cold gas), 0 kg (Missions 2–3), 394.694 kg (Mission 4), 0.793 kg (Mission 5), and 840.082 kg (Mission 7). The test lists the complete part combinations. No catalog masses or launcher capacities were changed. Balance, Workshop, readiness and physics checks passed; the revised slider has not been visually checked.
+
+## Continuous launch and flight
+
+The scripted ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the rocket's position and camera framing. Right-drag and the wheel control the camera, and M switches between flight and map view. The launch remains scripted and the ascent is visually compressed to 15 seconds.
+
+`godot --headless --path . --script res://tests/test_launch.gd` checks staging, station visibility, insertion continuity, shared camera/viewport ownership, and map switching. Launch, orbit, power, and campaign checks passed. A temporary Web preview was checked from pad through orbit and back from map view; a native run reported no rendering errors.

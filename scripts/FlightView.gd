@@ -43,6 +43,10 @@ var _skip_start := 0.0
 var _skip_remaining := 0.0
 var _failure_delay := 0.0
 var _flash_clock := 0.0
+var shared_launch: Control
+var _shared_rocket: Node3D
+var _shared_center := Vector3(0, -6371000.0, 0)
+const SHARED_SCALE := 1000.0 / FlightSim.RENDER_SCALE
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.FLIGHT_OPS
@@ -66,7 +70,7 @@ func _ready() -> void:
 				return
 		set_orbit(initial)
 	_initialize_power()
-	if GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
+	if shared_launch == null and GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
 		var fade := ColorRect.new()
 		fade.color = Color.BLACK
 		fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -141,6 +145,7 @@ func _build_scene() -> void:
 	sun.look_at(Vector3.LEFT, Vector3.UP)
 	_plotter = preload("res://scripts/OrbitPlotter.gd").new()
 	world.add_child(_plotter)
+	_plotter.visible = false
 	_marker = MeshInstance3D.new()
 	var marker_mesh := SphereMesh.new()
 	marker_mesh.radius = 0.5
@@ -256,13 +261,16 @@ func _process(delta: float) -> void:
 		var diameter := 8.0 * 2.0 * _camera.global_position.distance_to(_marker.global_position) * tan(deg_to_rad(_camera.fov) * 0.5) / pixels
 		_marker.scale = Vector3.ONE * maxf(0.5, diameter) if _map_view else Vector3.ONE
 		_marker.visible = _map_view
-		_craft_visual.visible = not _map_view
+		_craft_visual.visible = not _map_view and shared_launch == null
 		_craft_visual.position = _marker.position
 
 func _update_position() -> void:
 	var pos: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s, orbit.mu)
 	position_km = pos.rotated(orbit.arg_periapsis_rad)
 	_marker.position = Vector3(position_km.x, 0.0, position_km.y) * FlightSim.RENDER_SCALE
+	if is_instance_valid(_shared_rocket):
+		_marker.position = Vector3(position_km.y * 1000.0, position_km.x * 1000.0 - 6371000.0, 0)
+		_shared_rocket.position = _marker.position
 	var radius := float(position_km.length())
 	altitude_km = radius - FlightSim.R_EARTH_KM
 	speed_kms = FlightSim.speed_at_radius_kms(radius, orbit.semi_major_axis_km, orbit.mu)
@@ -290,19 +298,25 @@ func toggle_map_view() -> void:
 		_distance = _map_camera.z
 		_camera_mode = "Earth"
 	_map_view = not _map_view
+	_plotter.visible = _map_view
 	_map_button.text = "Flight view (M)" if _map_view else "Map view (M)"
 	_update_camera()
 
 func set_camera_preset(value: String) -> void:
 	if orbit == null: return
 	_camera_mode = value
-	_distance = 0.18 if value == "Spacecraft" else 190.0
+	_distance = (shared_launch.rocket_height * 1.9 if is_instance_valid(shared_launch) else 0.18) if value == "Spacecraft" else (190.0 * SHARED_SCALE if is_instance_valid(shared_launch) else 190.0)
 	if value == "Wide":
 		_distance = maxf(190.0, orbit.semi_major_axis_km * (1.0 + orbit.eccentricity) * FlightSim.RENDER_SCALE * 3.2)
 	_update_camera()
 
 func _update_camera() -> void:
+	if is_instance_valid(_shared_rocket):
+		_camera.near = 1000.0 if _map_view else 0.5
+		_camera.far = 100000000.0 if _map_view else 2000000.0
 	var target := _marker.position if _camera_mode == "Spacecraft" else Vector3.ZERO
+	if is_instance_valid(_shared_rocket):
+		target = _shared_rocket.position + Vector3(0, shared_launch.rocket_height * 0.5, 0) if _camera_mode == "Spacecraft" else _shared_center
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
 
@@ -316,7 +330,7 @@ func _view_input(event: InputEvent) -> void:
 		if event.pressed: _view.grab_focus()
 		if event.button_index == MOUSE_BUTTON_RIGHT: _dragging = event.pressed
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 0.06, 5000.0)
+			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 5.0 if shared_launch != null else 0.06, 100000000.0 if shared_launch != null else 5000.0)
 	elif event is InputEventMouseMotion and _dragging:
 		_yaw -= event.relative.x * 0.01
 		_pitch = clampf(_pitch + event.relative.y * 0.01, -1.4, 1.4)
@@ -407,3 +421,27 @@ func _open_debrief() -> void:
 	set_process(false)
 	if not DisplayServer.get_name() == "headless":
 		get_tree().call_deferred("change_scene_to_file", "res://scenes/Debrief.tscn")
+
+func activate_shared_world(view: SubViewportContainer, world: Node3D, rocket: Node3D, camera: Camera3D, camera_transform: Transform3D, yaw: float, pitch: float, distance: float) -> void:
+	var old_view := _view
+	var parent := old_view.get_parent()
+	var index := old_view.get_index()
+	_view = view
+	view.reparent(parent)
+	parent.move_child(view, index)
+	old_view.queue_free()
+	_camera = camera
+	_shared_rocket = rocket
+	_yaw = yaw
+	_pitch = pitch
+	_distance = distance
+	_ship_camera = Vector3(yaw, pitch, distance)
+	_map_camera = Vector3(yaw, pitch, 190.0 * SHARED_SCALE)
+	view.gui_input.disconnect(shared_launch._camera_input)
+	view.gui_input.connect(_view_input)
+	_marker.reparent(world)
+	_craft_visual.reparent(world)
+	_plotter.reparent(world)
+	_plotter.transform = Transform3D(Basis(Vector3.UP, Vector3.BACK, Vector3.RIGHT).scaled(Vector3.ONE * SHARED_SCALE), _shared_center)
+	_update_position()
+	_camera.global_transform = camera_transform

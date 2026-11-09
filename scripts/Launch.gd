@@ -31,6 +31,10 @@ var _camera_pitch := 0.13
 var _camera_distance := 1.9
 var _camera_dragging := false
 var _launch_view: SubViewportContainer
+var _station: Node3D
+var _flight: Control
+const EARTH_RADIUS_M := 6371000.0
+const INSERTION_ANGLE := 0.02
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.LAUNCH
@@ -148,8 +152,21 @@ func _create_world() -> void:
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45,-25,0)
 	_root3d.add_child(light)
-	_box(_root3d, Vector3(35, 1, 35), Vector3(0,-1,0), Color("454f5b"))
-	_box(_root3d, Vector3(2, rocket_height*0.85, 2), Vector3(-rocket_height*0.16,rocket_height*0.425,0), Color("596675"))
+	var planet := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = EARTH_RADIUS_M
+	sphere.height = EARTH_RADIUS_M * 2.0
+	sphere.radial_segments = 96
+	sphere.rings = 48
+	planet.mesh = sphere
+	planet.position.y = -EARTH_RADIUS_M - 2.0
+	planet.material_override = _material(Color("2462b3"))
+	_root3d.add_child(planet)
+	_station = Node3D.new()
+	_station.name = "LaunchStation"
+	_root3d.add_child(_station)
+	_box(_station, Vector3(35, 1, 35), Vector3(0,-1,0), Color("454f5b"))
+	_box(_station, Vector3(2, rocket_height*0.85, 2), Vector3(-rocket_height*0.16,rocket_height*0.425,0), Color("596675"))
 	_rocket = Node3D.new()
 	_root3d.add_child(_rocket)
 	var radius := rocket_height * 0.045
@@ -184,7 +201,8 @@ func _create_world() -> void:
 	_root3d.add_child(_flash)
 	_camera = Camera3D.new()
 	_camera.current = true
-	_camera.far = 5000
+	_camera.near = 0.5
+	_camera.far = 2000000.0
 	_root3d.add_child(_camera)
 	_update_camera()
 
@@ -256,7 +274,12 @@ func advance_ascent(delta: float) -> void:
 	_process_milestones(next)
 	elapsed = next
 	var progress := elapsed / ASCENT_SECONDS
-	_rocket.position = Vector3(rocket_height*2.0*progress*progress,rocket_height*5.0*progress,0)
+	var smooth := progress * progress * (3.0 - 2.0 * progress)
+	var target_altitude: float = 250000.0 if GameManager.current_mission.targetOrbit in ["GEO", "GTO"] else float(GameManager.current_mission.targetAltitudeKm) * 1000.0
+	var radius_m := EARTH_RADIUS_M + target_altitude * smooth
+	var angle := INSERTION_ANGLE * smooth
+	_rocket.position = Vector3(radius_m * sin(angle), radius_m * cos(angle) - EARTH_RADIUS_M, 0)
+	_station.visible = progress < 0.22
 	_rocket.rotation.z = -progress*0.8
 	_status.text = "ASCENT  T+%.1f s" % elapsed
 	_update_camera()
@@ -312,15 +335,22 @@ func _finish_success() -> void:
 		initial.eccentricity = (42164.0 - 6621.0) / (42164.0 + 6621.0)
 	else:
 		initial.semi_major_axis_km = FlightSim.R_EARTH_KM + float(mission.targetAltitudeKm)
+	initial.arg_periapsis_rad = INSERTION_ANGLE
 	GameManager.initial_orbit = initial
-	var fade := ColorRect.new()
-	fade.color = Color.BLACK
-	fade.modulate.a = 0
-	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(fade)
-	var tween := create_tween()
-	tween.tween_property(fade,"modulate:a",1.0,0.5)
-	tween.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/FlightView.tscn"))
+	_station.visible = false
+	_handoff_to_flight()
+
+func _handoff_to_flight() -> void:
+	# Retain the viewport, its World3D, rocket and current camera across insertion.
+	var previous_camera := _camera.global_transform
+	_flight = load("res://scenes/FlightView.tscn").instantiate()
+	_flight.set("shared_launch", self)
+	add_child(_flight)
+	_flight.activate_shared_world(_launch_view, _root3d, _rocket, _camera, previous_camera, _camera_yaw, _camera_pitch, _camera_distance * rocket_height)
+	for child in get_children():
+		if child != _flight: child.visible = false
+	_launch_view.visible = true
+	_flight.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _log(message: String, at: float = -1.0) -> void:
 	var seconds := int(elapsed if at < 0 else at)
