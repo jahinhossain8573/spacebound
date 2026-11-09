@@ -18,6 +18,22 @@ func run_tests() -> void:
 	check(manager.new_campaign() == OK, "new campaign save")
 	check(manager.is_mission_unlocked(1) and not manager.is_mission_unlocked(2), "mission gates")
 	check("pwr_gomspace_p31u" in manager.unlocked_part_ids, "tier zero parts")
+	var baseline_connections: int = manager.campaign_changed.get_connections().size()
+	for i in 3:
+		var select = load("res://scenes/MissionSelect.tscn").instantiate()
+		root.add_child(select)
+		check(manager.campaign_changed.get_connections().size() == baseline_connections + 1, "mission select has one scene-owned connection")
+		manager.science_points += 1
+		manager.campaign_changed.emit()
+		check(select._balance_label.text.contains("%d SP" % manager.science_points), "visible balance updates")
+		manager.debug_unlock_missions = true
+		manager.campaign_changed.emit()
+		check(not select._mission_buttons[2].disabled, "visible mission gate updates")
+		manager.debug_unlock_missions = false
+		select.free()
+		check(manager.campaign_changed.get_connections().size() == baseline_connections, "mission select disconnects after navigation")
+		manager.campaign_changed.emit()
+	manager.science_points = 0
 	var loss := {"mission_number":1, "launched":false, "objectives":[{"done":false}], "mass_margin_pct":20.0}
 	var score: Dictionary = manager.compute_score(loss)
 	check(score.outcome == "Mission Loss" and score.science_points == 6 and score.funds_millions == 0, "loss plus earned bonus")

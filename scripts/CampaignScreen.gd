@@ -7,6 +7,9 @@ var _selected: Dictionary = {}
 var _error_label: Label
 var _retry: Button
 var _retry_action: Callable
+var _balance_label: Label
+var _mission_buttons: Dictionary = {}
+var _start_button: Button
 
 func _ready() -> void:
 	var outer := MarginContainer.new()
@@ -103,10 +106,8 @@ func _credits() -> void:
 func _mission_select() -> void:
 	GameManager.state = GameManager.State.MISSION_SELECT
 	_label("MISSION SELECT", null, Color("00e5ff")).add_theme_font_size_override("font_size", 36)
-	var balance := _label("")
-	var update_balance := func(): balance.text = "Funds: $%.2fM    Science: %d SP" % [GameManager.funds_millions, GameManager.science_points]
-	update_balance.call()
-	GameManager.campaign_changed.connect(update_balance)
+	_balance_label = _label("")
+	GameManager.campaign_changed.connect(_refresh_campaign_ui)
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 32)
 	_body.add_child(columns)
@@ -123,11 +124,12 @@ func _mission_select() -> void:
 		var b := _button("%d. %s" % [number, mission.title], _select_mission.bind(mission), list)
 		b.disabled = not GameManager.is_mission_unlocked(number)
 		if b.disabled: b.text += " [Locked]"
-		GameManager.campaign_changed.connect(func(): b.disabled = not GameManager.is_mission_unlocked(number); b.text = "%d. %s%s" % [number, mission.title, " [Locked]" if b.disabled else ""])
+		_mission_buttons[number] = b
 	_button("Main Menu", func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	if ResourceLoader.exists("res://scenes/TechTree.tscn"):
 		_button("Research", func(): get_tree().change_scene_to_file("res://scenes/TechTree.tscn"))
 	_select_mission(GlobalData.get_mission(1))
+	_refresh_campaign_ui()
 
 func _select_mission(mission: Dictionary) -> void:
 	if mission.is_empty(): return
@@ -142,8 +144,8 @@ func _select_mission(mission: Dictionary) -> void:
 		names.append(GlobalData.get_part(id).get("name", id))
 	_label("Required: " + ", ".join(names), _details)
 	_label("Budget $%.2fM · Reward $%.2fM / %d SP" % [mission.budgetCapMillions, mission.rewardFundsMillions, mission.rewardSciencePoints], _details)
-	var start := _button("Start", _start_selected, _details)
-	start.disabled = not GameManager.is_mission_unlocked(int(mission.missionNumber))
+	_start_button = _button("Start", _start_selected, _details)
+	_start_button.disabled = not GameManager.is_mission_unlocked(int(mission.missionNumber))
 
 func _start_selected() -> void:
 	if GameManager.start_mission(int(_selected.missionNumber)):
@@ -185,3 +187,16 @@ func _debrief() -> void:
 
 func _return_to_missions() -> void:
 	get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn")
+
+func _refresh_campaign_ui() -> void:
+	_balance_label.text = "Funds: $%.2fM    Science: %d SP" % [GameManager.funds_millions, GameManager.science_points]
+	for number in _mission_buttons:
+		var button: Button = _mission_buttons[number]
+		button.disabled = not GameManager.is_mission_unlocked(number)
+		button.text = "%d. %s%s" % [number, GlobalData.get_mission(number).title, " [Locked]" if button.disabled else ""]
+	if is_instance_valid(_start_button):
+		_start_button.disabled = not GameManager.is_mission_unlocked(int(_selected.missionNumber))
+
+func _exit_tree() -> void:
+	if GameManager.campaign_changed.is_connected(_refresh_campaign_ui):
+		GameManager.campaign_changed.disconnect(_refresh_campaign_ui)
