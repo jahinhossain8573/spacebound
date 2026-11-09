@@ -499,6 +499,10 @@ func _update_readiness() -> void:
 	for child in _telemetry.get_children():
 		child.queue_free()
 	var endurance := "No load" if is_inf(stats.endurance_minutes) else "%.1f min" % stats.endurance_minutes
+	if mission.get("targetOrbit", "") == "SSO":
+		var capacity := Label.new()
+		capacity.text = "SSO capacity: %.0f kg" % stats.launcher_capacity_kg
+		_telemetry.add_child(capacity)
 	_add_telemetry("Mass", "%.2f / %.2f kg (%.1f%% margin)" % [stats.wet_mass_kg, stats.launcher_capacity_kg, stats.mass_margin_pct], stats.wet_mass_kg, stats.launcher_capacity_kg * 0.9, "Mass budget")
 	_add_telemetry("Volume", "%.2f / %.2f L" % [stats.internal_volume_liters, stats.volume_capacity_liters], stats.internal_volume_liters, stats.volume_capacity_liters, "Volume")
 	_add_telemetry("Power", "+%.1f / -%.1f W (net %.1f W)" % [stats.generation_w, stats.draw_w, stats.net_power_w], stats.draw_w, stats.generation_w, "Daylight power")

@@ -1,5 +1,13 @@
 extends RefCounted
 
+static func optical_installed(parts: Array) -> bool:
+	for part: Dictionary in parts:
+		if part.get("optical", false): return true
+	return false
+
+static func clear_observation_seconds(start: float, end: float, blocked_start: float, blocked_end: float) -> float:
+	return maxf(0.0, end - start - maxf(0.0, minf(end, blocked_end) - maxf(start, blocked_start)))
+
 static func reach_orbit(launched: bool) -> bool:
 	return launched
 

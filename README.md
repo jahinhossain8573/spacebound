@@ -140,3 +140,9 @@ In debug builds, F9 can set an event RNG seed and force an unused event by ID. R
 Orbital Sentinel requires a NanoCam, S-band radio, battery, and the RW-0.03 reaction wheels researched through A1. A deployable array supplies the reference build's 15.5 W load. Its four objectives cover orbit, 100 images, downlink, and 30-day survival. Images accrue once per completed sunlit pass when an optical instrument and active-pointing ADCS are installed; Skip updates the count during its animation. Cloud events block imaging during their seven-day window, and the final image total appears in Debrief and the saved receipt.
 
 Run `godot --headless --path . --script res://tests/test_mission2.gd`. Mission 2 and all existing suites pass, and the release Web export succeeds. An isolated browser preview with random events disabled showed 456 images, four completed objectives, Debrief, and Mission 3 availability. Public hosting remains deferred.
+
+### Mission 3: Delta Flood Watch
+
+A passing reference build uses Electron, the SSTL-50 bus, Spectrolab solar array, ABS battery, NanoMind A3200, RW-0.03 wheels, HyperScout-2 and Syrlinks EWC30. The 14-day mission starts at orbit insertion; seven cloudy days leave seven clear observation days. SSO is represented by a planar orbit. Image attribution is in [CREDITS.md](CREDITS.md).
+
+Run the dedicated checks with `godot --headless --path . --script res://tests/test_mission3.gd`.

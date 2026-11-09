@@ -182,6 +182,17 @@ func _debrief() -> void:
 	for objective in GameManager.last_result.get("objectives", []):
 		_label(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
 	if receipt.has("images_captured"): _label("Images captured: %d" % receipt.images_captured)
+	if receipt.has("clear_observation_s"): _label("Clear observation: %.1f days" % (receipt.clear_observation_s / 86400.0))
+	if int(GameManager.last_result.get("mission_number", 0)) == 3:
+		_label("Intense Flooding in Bangladesh — July 25, 2020", null, Color("00e5ff"))
+		var flood_image := TextureRect.new()
+		flood_image.texture = load("res://assets/images/nasa/bangladesh_flood.jpg")
+		flood_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		flood_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		flood_image.custom_minimum_size.y = 360
+		_body.add_child(flood_image)
+		_label("NASA Earth Observatory image by Lauren Dauphin, using MODIS data from NASA EOSDIS/LANCE and GIBS/Worldview.")
+		_label("Satellites like yours help agencies plan evacuations and relief.")
 	_label("Flight log")
 	for line in receipt.flight_log: _label(str(line))
 	for event_id in receipt.get("events_fired", []):

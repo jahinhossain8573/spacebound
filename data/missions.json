@@ -93,7 +93,7 @@
     "missionNumber": 3,
     "id": "mission_3",
     "title": "Delta Flood Watch",
-    "briefing": "Place a flood-monitoring spacecraft in Sun-synchronous orbit. Return observations of the Bengal Delta.",
+    "briefing": "The monsoon is coming. Put a multispectral imager into Sun-synchronous orbit so it passes over the Bengal Delta at the same local time every day, and downlink flood maps fast over X-band.",
     "targetOrbit": "SSO",
     "targetAltitudeKm": 650,
     "durationDays": 14,
@@ -110,7 +110,15 @@
     "budgetCapMillions": 30,
     "rewardFundsMillions": 52,
     "rewardSciencePoints": 70,
-    "unlocksTier": 2
+    "unlocksTier": 2,
+    "durationStartsAtOrbit": true,
+    "guaranteedEventId": "E9",
+    "objectives": [
+      {"id": "reach_orbit", "name": "Reach SSO", "trigger": "launch"},
+      {"id": "flood_maps", "name": "Capture flood maps over seven clear days", "trigger": "clear_days", "minimumClearDays": 7},
+      {"id": "downlink", "name": "Downlink flood maps over X-band", "trigger": "downlink", "minimumDataRateKbps": 50000},
+      {"id": "survive_duration", "name": "Survive mission duration", "trigger": "duration"}
+    ]
   },
   {
     "missionNumber": 4,

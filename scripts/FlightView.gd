@@ -5,6 +5,7 @@ const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
 var mission: Dictionary = {}
 var mission_elapsed_s: float = 0.0
+var _observation_start_s := 0.0
 var warp: int = 1
 var position_km := Vector2.ZERO
 var altitude_km := 0.0
@@ -65,6 +66,7 @@ const SHARED_SCALE := 1000.0 / FlightSim.RENDER_SCALE
 func _ready() -> void:
 	GameManager.state = GameManager.State.FLIGHT_OPS
 	mission_elapsed_s = GameManager.flight_elapsed_s
+	_observation_start_s = mission_elapsed_s
 	mission = GameManager.current_mission if not GameManager.current_mission.is_empty() else GlobalData.get_mission(1)
 	_build_scene()
 	if mission.get("targetOrbit", "") not in ["LEO", "SSO", "GEO", "GTO"]:
@@ -90,7 +92,9 @@ func _ready() -> void:
 	_view.get_parent().move_child(_burn_panel, _view.get_index())
 	_burn_panel.setup(self)
 	EventManager.register_flight(self)
-	if power_active: EventManager.roll_trigger("arrival")
+	if power_active:
+		EventManager.roll_trigger("arrival")
+		EventManager.trigger_mission_event()
 	if shared_launch == null and GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
 		var fade := ColorRect.new()
 		fade.color = Color.BLACK
@@ -247,6 +251,9 @@ func set_warp(value: int) -> void:
 	if EventManager.blocking: return
 	if value in WARP_LEVELS: warp = value
 
+func _mission_end_s() -> float:
+	return float(mission.durationDays) * 86400.0 + (_observation_start_s if mission.get("durationStartsAtOrbit", false) else 0.0)
+
 func advance_time(real_delta_s: float) -> void:
 	if EventManager.blocking or mission_finished or power_failed or not _skip_result.is_empty() or orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
 	var elapsed := real_delta_s * warp
@@ -258,7 +265,7 @@ func advance_time(real_delta_s: float) -> void:
 			_wait_target = -1.0
 			warp = 1
 	if power_active:
-		var remaining := minf(elapsed, maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s))
+		var remaining := minf(elapsed, maxf(0.0, _mission_end_s() - mission_elapsed_s))
 		var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 		var fraction := _eclipse_fraction()
 		var result: Dictionary = FlightSim.simulate_mission_skip(remaining, period_s, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, _sun_phase(period_s, fraction), _sunlit_pass_started)
@@ -274,7 +281,8 @@ func advance_time(real_delta_s: float) -> void:
 			_apply_image_passes(images_captured, before + result.sunlit_pass_completed_s, mission_elapsed_s, period_s)
 		if not result.survived: _power_failure("POWER FAILURE")
 		_update_position()
-		if not power_failed and mission_elapsed_s >= float(mission.durationDays) * 86400.0: _complete_duration()
+		_update_mission_objectives()
+		if not power_failed and mission_elapsed_s >= _mission_end_s(): _complete_duration()
 		return
 	mission_elapsed_s += elapsed
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
@@ -303,6 +311,7 @@ func _process(delta: float) -> void:
 	else:
 		advance_time(delta)
 	_update_battery_hud()
+	_update_mission_objectives()
 	_update_objectives()
 	if is_instance_valid(_burn_panel): _burn_panel.refresh()
 	if orbit != null:
@@ -327,7 +336,7 @@ func _update_position() -> void:
 	in_eclipse = is_in_eclipse(position_km)
 	var periapsis := orbit.semi_major_axis_km * (1.0 - orbit.eccentricity) - FlightSim.R_EARTH_KM
 	var apoapsis := orbit.semi_major_axis_km * (1.0 + orbit.eccentricity) - FlightSim.R_EARTH_KM
-	var name: String = "Sun-synchronous" if mission.get("targetOrbit", "") == "SSO" else str(mission.get("title", "Orbit preview"))
+	var name: String = "Sun-synchronous, 98° inclination (planar simulation)" if mission.get("targetOrbit", "") == "SSO" else str(mission.get("title", "Orbit preview"))
 	_hud.text = "%s\nElapsed %.1f s  |  Altitude %.1f km  |  Speed %.3f km/s\nPeriapsis %.1f km  |  Apoapsis %.1f km  |  Period %.1f s  |  %dx  |  %s" % [name, mission_elapsed_s, altitude_km, speed_kms, periapsis, apoapsis, FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu), warp, "ECLIPSE" if in_eclipse else "SUNLIGHT"]
 
 func is_in_eclipse(pos_km: Vector2) -> bool:
@@ -423,7 +432,7 @@ func skip_mission_time() -> void:
 	if not can_skip_mission(): return
 	_skip_pending = true
 	_skip_start = mission_elapsed_s
-	_skip_remaining = maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s)
+	_skip_remaining = maxf(0.0, _mission_end_s() - mission_elapsed_s)
 	# Notify event listeners before reading power totals and computing the result.
 	GameManager.mission_skip_started.emit(_skip_remaining)
 	if EventManager.blocking:
@@ -563,6 +572,12 @@ func _update_mission_objectives() -> void:
 					_images_label.visible = true
 					_images_label.text = "Images captured: %d / %d" % [images_captured, int(definition.targetImages)]
 					objective.done = MISSION_OBJECTIVES.imaging(parts) and images_captured >= int(definition.targetImages) and not GameManager.last_result.get("optical_objective_blocked", false)
+				"clear_days":
+					var clear_s: float = MISSION_OBJECTIVES.clear_observation_seconds(_observation_start_s, mission_elapsed_s, float(GameManager.last_result.get("optical_blocked_from_s", 0.0)), float(GameManager.last_result.get("optical_blocked_until_s", 0.0)))
+					GameManager.last_result["clear_observation_s"] = clear_s
+					_images_label.visible = true
+					_images_label.text = "Clear observation: %.1f / %.0f days" % [clear_s / 86400.0, float(definition.minimumClearDays)]
+					objective.done = MISSION_OBJECTIVES.optical_installed(parts) and clear_s >= float(definition.minimumClearDays) * 86400.0 and not GameManager.last_result.get("optical_objective_blocked", false)
 
 func _apply_image_passes(base: int, first_s: float, until_s: float, period_s: float) -> void:
 	var has_imaging := false

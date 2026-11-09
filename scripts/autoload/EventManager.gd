@@ -95,6 +95,13 @@ func roll_extension() -> void:
 	var item := get_event("E18")
 	if random_enabled and not item.is_empty() and eligible(item) and rng.randf() < float(item.probability) * probability_multiplier(): _enqueue(item)
 
+func trigger_mission_event() -> void:
+	if not random_enabled or not is_instance_valid(flight): return
+	var item := get_event(str(flight.mission.get("guaranteedEventId", "")))
+	if not item.is_empty() and eligible(item):
+		_remaining_s = maxf(0.0, flight._mission_end_s() - flight.mission_elapsed_s)
+		_enqueue(item)
+
 func force_event(id: String) -> bool:
 	if not OS.is_debug_build() or not is_instance_valid(flight) or GameManager.last_result.is_empty(): return false
 	var item := get_event(id.to_upper())
@@ -169,6 +176,7 @@ func _choose(choice: String) -> void:
 				flight._power_failure("SPACECRAFT LOST: DEBRIS IMPACT")
 			else: message = "Conjunction passed without damage."
 		"E9":
+			GameManager.last_result["optical_blocked_from_s"] = flight.mission_elapsed_s
 			GameManager.last_result["optical_blocked_until_s"] = flight.mission_elapsed_s + 7.0 * 86400.0
 			if _remaining_s < 7.0 * 86400.0:
 				GameManager.last_result["optical_objective_blocked"] = true
