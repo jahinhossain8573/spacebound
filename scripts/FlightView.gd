@@ -47,6 +47,9 @@ var _sunlit_pass_started := false
 var _objective_label: Label
 var _beacon_label: Label
 var _skip_beacon_at := -1.0
+var _wait_target := -1.0
+var _burn_panel: VBoxContainer
+var remaining_propellant_kg := 0.0
 var shared_launch: Control
 var _shared_rocket: Node3D
 var _shared_center := Vector3(0, -6371000.0, 0)
@@ -74,6 +77,10 @@ func _ready() -> void:
 				return
 		set_orbit(initial)
 	_initialize_power()
+	_burn_panel = load("res://scenes/ui/BurnPanel.tscn").instantiate()
+	_view.get_parent().add_child(_burn_panel)
+	_view.get_parent().move_child(_burn_panel, _view.get_index())
+	_burn_panel.setup(self)
 	if shared_launch == null and GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
 		var fade := ColorRect.new()
 		fade.color = Color.BLACK
@@ -212,13 +219,15 @@ func set_orbit(value: OrbitState) -> bool:
 		_marker.visible = false
 		_plotter.redraw(null)
 		return false
+	var initial_orbit := orbit == null
 	orbit = value.copy()
 	orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s, period)
 	_error.text = ""
 	_marker.visible = true
 	_plotter.redraw(orbit)
 	_update_position()
-	set_camera_preset(_camera_mode)
+	if initial_orbit: set_camera_preset(_camera_mode)
+	else: _update_camera()
 	return true
 
 func set_warp(value: int) -> void:
@@ -227,6 +236,13 @@ func set_warp(value: int) -> void:
 func advance_time(real_delta_s: float) -> void:
 	if mission_finished or power_failed or not _skip_result.is_empty() or orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
 	var elapsed := real_delta_s * warp
+	if _wait_target >= 0.0:
+		var wait_period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
+		var until := fposmod(_wait_target - orbit.time_since_periapsis_s, wait_period)
+		if elapsed >= until:
+			elapsed = until
+			_wait_target = -1.0
+			warp = 1
 	if power_active:
 		var remaining := minf(elapsed, maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s))
 		var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
@@ -269,6 +285,7 @@ func _process(delta: float) -> void:
 		advance_time(delta)
 	_update_battery_hud()
 	_update_objectives()
+	if is_instance_valid(_burn_panel): _burn_panel.refresh()
 	if orbit != null:
 		_update_camera()
 		var pixels := maxf(1.0, float(_view.size.y))
@@ -484,3 +501,9 @@ func _update_objectives() -> void:
 	for objective in GameManager.last_result.get("objectives", []):
 		lines.append(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
 	_objective_label.text = "  |  ".join(lines)
+
+func wait_for_apsis(apoapsis: bool) -> void:
+	if orbit == null or orbit.eccentricity < 0.001 or power_failed or mission_finished or not _skip_result.is_empty(): return
+	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
+	_wait_target = period * 0.5 if apoapsis else 0.0
+	warp = 1000

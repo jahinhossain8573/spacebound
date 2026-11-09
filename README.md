@@ -116,3 +116,9 @@ The scripted ascent and orbital flight share the same Earth, spacecraft, viewpor
 The reference build uses P31u panels, BP4 battery, NanoMind A3200 computer and EnduroSat UHF on the 1U/3U bus. The first signal requires a complete powered sunlit pass after eclipse exit; Skip can simulate it. A successful reference mission earns 92.5 points, $16M and 17 SP with existing bonus rules.
 
 Run `godot --headless --path . --script res://tests/test_mission1.gd`. Mission 1 and existing regression suites pass, and the release Web export succeeds. Public hosting remains deferred. The full native and browser campaign playthrough, reload, and resize checks remain to be verified.
+
+## Orbital burns
+
+In FlightView, enter Δv in m/s, choose prograde or retrograde, and execute. The panel shows remaining fuel, available Δv, estimated burn duration, and the predicted apsides. Wait for apoapsis or periapsis to warp to the chosen point; these controls are disabled for circular orbits. The model turns before the impulse, and fuel remains aboard the transient flight state. Escaping or unaffordable burns are rejected. Burns are planar and instantaneous; finite-duration physics and maneuver nodes are future work.
+
+Run `godot --headless --path . --script res://tests/test_burns.gd`. The burn, orbit, launch, power, Mission 1, physics, readiness, and campaign checks pass. An isolated Web preview verified entering 1,470 m/s, waiting for apoapsis, circularizing the GTO orbit, fuel reduction, and enabling mission-time Skip. Public hosting remains deferred.

@@ -1,6 +1,7 @@
 extends Node
 
 signal mission_skip_started(remaining_s: float)
+signal burn_executed(dv_mps: float)
 signal campaign_changed
 
 enum State { MAIN_MENU, MISSION_SELECT, WORKSHOP, LAUNCH, FLIGHT_OPS, DEBRIEF, TECH_TREE }
