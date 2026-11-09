@@ -90,3 +90,11 @@ Run `godot --headless --path . --script res://tests/test_orbit.gd`. All orbit an
 A ready Workshop build opens the launch countdown. Press Space or Launch now to ignite; subsequent successful launches can skip the ascent. Failed launches cannot be skipped. In debug builds, F9 offers mutually exclusive reliability overrides. Lunar destinations remain unavailable until their dedicated scenes exist.
 
 Run `godot --headless --path . --script res://tests/test_launch.gd`. Launch, orbit, readiness, campaign, Workshop, physics, and data checks passed on Godot 4.7.2. An isolated native capture and temporary Web preview showed the rocket, staging, fairing separation, and flight handoff. Interactive native controls, browser resizing, failure visuals, and frame pacing still need manual verification.
+
+## Battery and mission-time skip
+
+FlightView now charges batteries in sunlight and drains them in eclipse, including at high time warp. Below 15%, the bar flashes red with LOW BATTERY. Depletion stops simulation and opens Debrief after three seconds. Orbit-only previews display battery availability without settling campaign results.
+
+Skip mission time starts from the current charge and orbital phase, emits `GameManager.mission_skip_started(remaining_s)` before calculation, and animates the clock and minimum battery display over three seconds. Mission 4 requires circular GEO before skip is enabled; its maneuver implementation remains a later issue. The helper accepts optional `start_wh` and sunlight-first `phase_s` arguments while preserving existing callers. Minimum battery percentage is passed to campaign scoring.
+
+Run `godot --headless --path . --script res://tests/test_power.gd`. All 16 power checks and existing data, physics, Workshop, readiness, campaign, orbit, and launch suites pass. A temporary Web Mission 1 fixture verified the battery HUD, skip animation, Debrief, payout, and Tier 1 unlock. Native visual interaction, low-battery flashing, and failure presentation remain manually unverified. Alarm audio and event effects belong to later issues.

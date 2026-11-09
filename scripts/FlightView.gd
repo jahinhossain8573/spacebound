@@ -20,6 +20,24 @@ var _pitch := 0.65
 var _distance := 190.0
 var _camera_mode := "Earth"
 var _dragging := false
+var battery_capacity_wh := 0.0
+var battery_charge_wh := 0.0
+var battery_lowest_pct := 100.0
+var generation_w := 0.0
+var draw_w := 0.0
+var power_active := false
+var power_failed := false
+var mission_finished := false
+var _battery_bar: ProgressBar
+var _battery_label: Label
+var _skip_button: Button
+var _skip_result: Dictionary = {}
+var _skip_pending := false
+var _skip_animation := 0.0
+var _skip_start := 0.0
+var _skip_remaining := 0.0
+var _failure_delay := 0.0
+var _flash_clock := 0.0
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.FLIGHT_OPS
@@ -42,6 +60,7 @@ func _ready() -> void:
 				_error.text = "This mission needs its own lunar flight scene. Use Back to return."
 				return
 		set_orbit(initial)
+	_initialize_power()
 
 func _build_scene() -> void:
 	var layout := VBoxContainer.new()
@@ -58,6 +77,15 @@ func _build_scene() -> void:
 	_hud = Label.new()
 	_hud.add_theme_color_override("font_color", Color("00e5ff"))
 	layout.add_child(_hud)
+	_battery_label = Label.new()
+	layout.add_child(_battery_label)
+	_battery_bar = ProgressBar.new()
+	_battery_bar.custom_minimum_size.y = 22
+	layout.add_child(_battery_bar)
+	_skip_button = Button.new()
+	_skip_button.text = "Skip mission time"
+	_skip_button.pressed.connect(skip_mission_time)
+	layout.add_child(_skip_button)
 	_error = Label.new()
 	_error.add_theme_color_override("font_color", Color("ff4d4d"))
 	layout.add_child(_error)
@@ -146,15 +174,46 @@ func set_warp(value: int) -> void:
 	if value in WARP_LEVELS: warp = value
 
 func advance_time(real_delta_s: float) -> void:
-	if orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
+	if mission_finished or power_failed or not _skip_result.is_empty() or orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
 	var elapsed := real_delta_s * warp
+	if power_active:
+		var remaining := minf(elapsed, maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s))
+		while remaining > 0.000001 and not power_failed:
+			var step := minf(5.0, remaining)
+			var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
+			orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + step * 0.5, period_s)
+			_update_position()
+			var rate := -draw_w if in_eclipse else generation_w - draw_w
+			battery_charge_wh = clampf(battery_charge_wh + rate * step / 3600.0, 0.0, battery_capacity_wh)
+			_track_battery()
+			mission_elapsed_s += step
+			orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + step * 0.5, period_s)
+			remaining -= step
+			if battery_charge_wh <= 0.0 and rate < 0.0: _power_failure("POWER FAILURE")
+		_update_position()
+		if not power_failed and mission_elapsed_s >= float(mission.durationDays) * 86400.0: _complete_duration()
+		return
 	mission_elapsed_s += elapsed
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 	orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s + elapsed, period)
 	_update_position()
 
 func _process(delta: float) -> void:
-	advance_time(delta)
+	_flash_clock += delta
+	if _failure_delay > 0.0:
+		_failure_delay -= delta
+		if _failure_delay <= 0.0: _open_debrief()
+	elif not _skip_result.is_empty():
+		_skip_animation += delta
+		mission_elapsed_s = _skip_start + _skip_remaining * minf(1.0, _skip_animation / 3.0)
+		_update_position()
+		if _skip_animation >= 3.0:
+			battery_charge_wh = _skip_result.end_wh
+			if _skip_result.survived: _complete_duration()
+			else: _power_failure("Battery depleted on orbit %d" % _skip_result.failed_orbit)
+	else:
+		advance_time(delta)
+	_update_battery_hud()
 	if orbit != null:
 		_update_camera()
 		var pixels := maxf(1.0, float(_view.size.y))
@@ -215,3 +274,78 @@ func _view_input(event: InputEvent) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _dragging = false
+
+func _initialize_power() -> void:
+	power_active = orbit != null and not GameManager.current_build.is_empty() and not GameManager.attempt_id.is_empty() and not GameManager.last_result.is_empty()
+	if power_active:
+		var stats: Dictionary = preload("res://scripts/BuildStats.gd").new().calculate_stats(GameManager.current_build, mission)
+		generation_w = stats.generation_w
+		draw_w = stats.draw_w
+		battery_capacity_wh = stats.battery_wh
+		battery_charge_wh = battery_capacity_wh
+	_update_battery_hud()
+
+func _track_battery() -> void:
+	var pct := battery_charge_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0.0 else 0.0
+	battery_lowest_pct = minf(battery_lowest_pct, pct)
+	GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
+
+func can_skip_mission() -> bool:
+	if not power_active or power_failed or mission_finished or orbit == null or _skip_pending or not _skip_result.is_empty(): return false
+	if mission.get("targetOrbit", "") in ["GEO", "GTO"]:
+		return orbit.eccentricity < 0.01 and absf(orbit.semi_major_axis_km - 42164.0) < 422.0
+	return mission.get("targetOrbit", "") in ["LEO", "SSO"]
+
+func skip_mission_time() -> void:
+	if not can_skip_mission(): return
+	_skip_pending = true
+	_skip_start = mission_elapsed_s
+	_skip_remaining = maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s)
+	# Notify event listeners before reading power totals and computing the result.
+	GameManager.mission_skip_started.emit(_skip_remaining)
+	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
+	var fraction: float = 72.0 / 1436.0 if mission.get("targetOrbit", "") in ["GEO", "GTO"] else FlightSim.eclipse_fraction(orbit.semi_major_axis_km)
+	# The skip helper's cycle starts at eclipse exit, with sunlight first.
+	var phase := fposmod(orbit.time_since_periapsis_s + orbit.arg_periapsis_rad / TAU * period - period * (0.5 + fraction * 0.5), period)
+	_skip_result = FlightSim.simulate_mission_skip(_skip_remaining, period, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, phase)
+	battery_lowest_pct = minf(battery_lowest_pct, _skip_result.lowest_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0)
+	GameManager.last_result["battery_lowest_pct"] = battery_lowest_pct
+	_skip_animation = 0.0
+
+func _update_battery_hud() -> void:
+	if _battery_bar == null: return
+	var pct := battery_charge_wh / battery_capacity_wh * 100.0 if battery_capacity_wh > 0 else 0.0
+	if not _skip_result.is_empty(): pct = battery_lowest_pct
+	_battery_bar.value = pct
+	var low := pct < 15.0
+	_battery_bar.modulate = Color("ff4d4d") if low and fmod(_flash_clock, 0.7) < 0.35 else Color.WHITE
+	_battery_label.text = ("LOW BATTERY  " if low and power_active else "") + ("Battery %.1f%% (%.1f / %.1f Wh)" % [pct, battery_charge_wh, battery_capacity_wh] if power_active else "Battery unavailable in orbit preview")
+	if not _skip_result.is_empty():
+		_battery_label.text = "Simulated minimum battery: %.1f%%" % battery_lowest_pct
+	_skip_button.disabled = not can_skip_mission()
+	_skip_button.tooltip_text = "Reach circular GEO before skipping." if mission.get("targetOrbit", "") in ["GEO", "GTO"] else "Complete the mission duration using the current battery charge."
+
+func _power_failure(message: String) -> void:
+	if power_failed or mission_finished: return
+	power_failed = true
+	_error.text = message
+	_failure_delay = 3.0
+	_set_objective("Survive mission duration", false)
+	GameManager.last_result.flight_log.append("T+%.1fs %s" % [mission_elapsed_s, message])
+
+func _set_objective(name: String, done: bool) -> void:
+	for objective in GameManager.last_result.get("objectives", []):
+		if objective.get("name", "") == name: objective.done = done
+
+func _complete_duration() -> void:
+	if mission_finished: return
+	mission_finished = true
+	_set_objective("Survive mission duration", true)
+	_set_objective("Mission objective", true)
+	GameManager.last_result.flight_log.append("T+%.1fs Mission duration completed" % mission_elapsed_s)
+	_open_debrief()
+
+func _open_debrief() -> void:
+	set_process(false)
+	if not DisplayServer.get_name() == "headless":
+		get_tree().call_deferred("change_scene_to_file", "res://scenes/Debrief.tscn")

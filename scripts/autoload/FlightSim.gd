@@ -105,30 +105,27 @@ func position_on_orbit_km(semi_major_axis_km: float, eccentricity: float, time_s
 
 ## Starts with a full battery at the start of sunlight; failure orbit is one-based.
 ## The last orbit is truncated to duration_s. Reaching zero charge is failure.
-func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fraction: float, gen_w: float, draw_w: float, battery_wh: float) -> Dictionary:
-	var charge_wh := maxf(0.0, battery_wh)
-	var lowest_wh := charge_wh
-	if duration_s <= 0.0:
-		return {"survived": true, "lowest_wh": lowest_wh, "failed_orbit": -1}
-	if orbit_period_s <= 0.0 or not is_finite(duration_s) or not is_finite(orbit_period_s):
-		return {"survived": false, "lowest_wh": 0.0, "failed_orbit": 1}
-	var fraction := clampf(eclipse_fraction, 0.0, 1.0)
-	var sunlight_s := orbit_period_s * (1.0 - fraction)
-	var generation := maxf(0.0, gen_w)
-	var load_w := maxf(0.0, draw_w)
-	var remaining_s := duration_s
-	var orbit := 0
-	while remaining_s > 0.0:
-		orbit += 1
-		var step_s := minf(remaining_s, orbit_period_s)
-		var sun_s := minf(step_s, sunlight_s)
-		charge_wh = minf(battery_wh, charge_wh + (generation - load_w) * sun_s / 3600.0)
-		lowest_wh = minf(lowest_wh, charge_wh)
-		if charge_wh <= 0.0:
-			return {"survived": false, "lowest_wh": 0.0, "failed_orbit": orbit}
-		charge_wh -= load_w * maxf(0.0, step_s - sun_s) / 3600.0
-		lowest_wh = minf(lowest_wh, charge_wh)
-		if charge_wh <= 0.0:
-			return {"survived": false, "lowest_wh": 0.0, "failed_orbit": orbit}
-		remaining_s -= step_s
-	return {"survived": true, "lowest_wh": lowest_wh, "failed_orbit": -1}
+func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fraction: float, gen_w: float, draw_w: float, battery_wh: float, start_wh: float = -1.0, phase_s: float = 0.0) -> Dictionary:
+	var capacity := maxf(0.0, battery_wh)
+	var charge := capacity if start_wh < 0.0 else clampf(start_wh, 0.0, capacity)
+	var lowest := charge
+	if not is_finite(duration_s) or not is_finite(orbit_period_s) or orbit_period_s <= 0.0:
+		return {"survived":false, "lowest_wh":0.0, "end_wh":charge, "failed_orbit":1}
+	var remaining := maxf(0.0, duration_s)
+	var sun_end := orbit_period_s * (1.0 - clampf(eclipse_fraction, 0.0, 1.0))
+	var phase := fposmod(phase_s, orbit_period_s)
+	var elapsed := 0.0
+	while remaining > 0.000001:
+		var sunlight := phase < sun_end
+		var boundary := sun_end if sunlight else orbit_period_s
+		var step := minf(remaining, boundary - phase)
+		var rate := maxf(0.0, gen_w) - maxf(0.0, draw_w) if sunlight else -maxf(0.0, draw_w)
+		var next := clampf(charge + rate * step / 3600.0, 0.0, capacity)
+		lowest = minf(lowest, next)
+		if next <= 0.0 and rate < 0.0:
+			return {"survived":false, "lowest_wh":0.0, "end_wh":0.0, "failed_orbit":int(elapsed / orbit_period_s) + 1}
+		charge = next
+		remaining -= step
+		elapsed += step
+		phase = fposmod(phase + step, orbit_period_s)
+	return {"survived":true, "lowest_wh":lowest, "end_wh":charge, "failed_orbit":-1}
