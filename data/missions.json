@@ -125,6 +125,7 @@
     "id": "mission_4",
     "title": "Geostationary Gateway: Bangabandhu Satellite-1",
     "briefing": "Build a communications satellite and circularize its orbit at geostationary altitude. Operate it for one year.",
+    "historyNote": "Bangabandhu Satellite-1 was built by Thales Alenia Space on a Spacebus 4000B2 platform and operates at 119.1° East.",
     "targetOrbit": "GEO",
     "targetAltitudeKm": 35786,
     "durationDays": 365,
@@ -142,7 +143,13 @@
     "budgetCapMillions": 180,
     "rewardFundsMillions": 175,
     "rewardSciencePoints": 110,
-    "unlocksTier": 3
+    "unlocksTier": 3,
+    "objectives": [
+      {"id": "reach_orbit", "name": "Reach GTO", "trigger": "launch"},
+      {"id": "circularize", "name": "Circularize at GEO: wait until apoapsis, then burn prograde about 1,470 m/s", "trigger": "circularize", "targetRadiusKm": 42164},
+      {"id": "transponders", "name": "Operate powered transponders", "trigger": "powered_part", "requiredPartId": "inst_kuka_transponder_suite"},
+      {"id": "survive_duration", "name": "Survive mission duration", "trigger": "duration"}
+    ]
   },
   {
     "missionNumber": 5,

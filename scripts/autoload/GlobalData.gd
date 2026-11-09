@@ -109,11 +109,13 @@ func _valid_record(item: Dictionary, kind: String) -> bool:
 					if not objective is Dictionary: return false
 					for key in ["id", "name", "trigger"]:
 						if not objective.get(key) is String or objective[key].is_empty(): return false
-					if objective.id in objective_ids or objective.trigger not in ["launch", "sunlit_pass", "duration", "imaging", "downlink", "clear_days"]: return false
+					if objective.id in objective_ids or objective.trigger not in ["launch", "sunlit_pass", "duration", "imaging", "downlink", "clear_days", "circularize", "powered_part"]: return false
 					objective_ids[objective.id] = true
 					if objective.trigger == "imaging" and (not _is_number(objective.get("targetImages")) or objective.targetImages < 1 or objective.targetImages != floor(objective.targetImages)): return false
 					if objective.trigger == "clear_days" and (not _is_number(objective.get("minimumClearDays")) or objective.minimumClearDays <= 0): return false
 					if objective.trigger == "downlink" and (not _is_number(objective.get("minimumDataRateKbps")) or objective.minimumDataRateKbps <= 0): return false
+					if objective.trigger == "circularize" and (not _is_number(objective.get("targetRadiusKm")) or objective.targetRadiusKm <= 0): return false
+					if objective.trigger == "powered_part" and (not objective.get("requiredPartId") is String or objective.requiredPartId.is_empty()): return false
 					if objective.trigger == "sunlit_pass":
 						for key in ["requiredPartId", "message"]:
 							if not objective.get(key) is String or objective[key].is_empty(): return false

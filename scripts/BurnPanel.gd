@@ -29,7 +29,8 @@ func setup(owner_flight: Control) -> void:
 	_value = SpinBox.new()
 	_value.custom_minimum_size.x = 130
 	_value.step = 1
-	_value.update_on_text_changed = true
+	# Commit the full typed value before refreshing the prediction.
+	_value.update_on_text_changed = false
 	_value.suffix = "m/s"
 	_value.value_changed.connect(func(_v): refresh())
 	controls.add_child(_value)

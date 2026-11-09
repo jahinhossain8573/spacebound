@@ -66,7 +66,7 @@ func run_readiness_review(build: Dictionary, mission: Dictionary) -> Array[Dicti
 	_add(checks, "Eclipse endurance", "FAIL" if battery_fail else ("ADVISORY" if battery_advisory else "PASS"), "Battery %.1f Wh; eclipse %.1f min. Add a battery such as GomSpace BP4 if needed." % [s.battery_wh, s.eclipse_minutes])
 	_add(checks, "Flight computer", "PASS" if computer else "FAIL", "On-board computer installed." if computer else "No on-board computer installed. Add avionics.")
 	if mission.get("targetOrbit", "") in ["GEO", "GTO", "Lunar Flyby", "Lunar Surface"] or "radiationHardened" in mission.get("requiredCapabilities", []):
-		_add(checks, "Radiation", "PASS" if hardened else "FAIL", "Radiation-hardened avionics installed." if hardened else "Install radiation-hardened avionics such as the BAE RAD750.")
+		_add(checks, "Radiation", "PASS" if hardened else "FAIL", "Radiation-hardened avionics installed." if hardened else "Install radiation-hardened avionics such as the BAE RAD750 (research A5).")
 	var dv_fail: bool = s.delta_v_target_mps > 0.0 and (s.engine.is_empty() or s.delta_v_mps < s.delta_v_target_mps)
 	var dv_advisory: bool = not dv_fail and mission.get("requiredDeltaVMps", 0.0) > 0 and s.delta_v_mps > float(mission.requiredDeltaVMps) * 1.5
 	_add(checks, "Delta-v", "FAIL" if dv_fail else ("ADVISORY" if dv_advisory else "PASS"), "Delta-v %.1f / %.1f m/s including margin. Add an engine or fuel if needed." % [s.delta_v_mps, s.delta_v_target_mps])

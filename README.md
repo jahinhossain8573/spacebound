@@ -146,3 +146,9 @@ Run `godot --headless --path . --script res://tests/test_mission2.gd`. Mission 2
 A passing reference build uses Electron, the SSTL-50 bus, Spectrolab solar array, ABS battery, NanoMind A3200, RW-0.03 wheels, HyperScout-2 and Syrlinks EWC30. The 14-day mission starts at orbit insertion; seven cloudy days leave seven clear observation days. SSO is represented by a planar orbit. Image attribution is in [CREDITS.md](CREDITS.md).
 
 Run the dedicated checks with `godot --headless --path . --script res://tests/test_mission3.gd`.
+
+### Mission 4: Geostationary Gateway
+
+The reference build uses Falcon 9, the heavy bus, Airbus array, EaglePicher battery, RAD750, R-4D-15 and Ku/Ka transponders, with 400 kg of propellant. Wait for apoapsis and burn prograde about 1,470 m/s; Skip becomes available once GEO is reached. An underperforming burn can be corrected with a second burn. The orbit model is planar and burns are instantaneous.
+
+Run `godot --headless --path . --script res://tests/test_mission4.gd` and `godot --headless --path . --script res://tests/test_day2_campaign.gd`. The fresh-campaign reference path has 96 SP before spending 82 SP on Mission 4 research. The full suite and a release Web export pass; a local browser preview verified the launch, apoapsis wait and GEO burn. Public deployment remains deferred.

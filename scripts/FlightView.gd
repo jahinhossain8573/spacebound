@@ -565,6 +565,17 @@ func _update_mission_objectives() -> void:
 		for objective in GameManager.last_result.get("objectives", []):
 			if objective.get("id", "") != definition.id: continue
 			match definition.trigger:
+				"circularize":
+					var achieved: bool = MISSION_OBJECTIVES.circularize(orbit, float(definition.targetRadiusKm))
+					if achieved and not objective.done:
+						_beacon_label.text = "Geostationary orbit achieved"
+						GameManager.last_result.flight_log.append("T+%.1fs Geostationary orbit achieved" % mission_elapsed_s)
+					objective.done = achieved
+				"powered_part":
+					var installed := false
+					for part in parts:
+						if part.get("id", "") == definition.requiredPartId: installed = true
+					objective.done = GameManager.last_result.get("launched", false) and installed and generation_w >= draw_w
 				"downlink":
 					objective.done = MISSION_OBJECTIVES.reach_orbit(GameManager.last_result.get("launched", false)) and MISSION_OBJECTIVES.downlink(parts, float(definition.minimumDataRateKbps))
 				"imaging":
