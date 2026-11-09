@@ -89,30 +89,61 @@ func _make_ui() -> void:
 	_category_container = VBoxContainer.new()
 	_category_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	part_scroll.add_child(_category_container)
+	var center := VBoxContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_child(center)
 	_viewport_container = SubViewportContainer.new()
 	_viewport_container.stretch = true
 	_viewport_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_viewport_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_viewport_container.focus_mode = Control.FOCUS_ALL
 	_viewport_container.gui_input.connect(_viewport_input)
-	columns.add_child(_viewport_container)
+	center.add_child(_viewport_container)
 	var viewport := SubViewport.new()
 	viewport.name = "SpacecraftViewport"
 	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_viewport_container.add_child(viewport)
+	var objective_panel := PanelContainer.new()
+	objective_panel.name = "MissionObjectivePanel"
+	center.add_child(objective_panel)
+	var objective_margin := MarginContainer.new()
+	for edge in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		objective_margin.add_theme_constant_override(edge, 12)
+	objective_panel.add_child(objective_margin)
+	var objective_content := VBoxContainer.new()
+	objective_margin.add_child(objective_content)
+	var objective_title := Label.new()
+	objective_title.text = "MISSION OBJECTIVE  /  " + str(mission.title)
+	objective_title.add_theme_color_override("font_color", Color("00e5ff"))
+	objective_content.add_child(objective_title)
+	var objective_brief := Label.new()
+	objective_brief.text = str(mission.get("briefing", ""))
+	objective_brief.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_content.add_child(objective_brief)
+	var required_names: Array[String] = []
+	for part_id in mission.get("requiredPartIds", []):
+		required_names.append(str(GlobalData.get_part(part_id).get("name", part_id)))
+	var objective_details := Label.new()
+	objective_details.text = "%s  ·  %s km  ·  %s days\nRequired: %s" % [mission.get("targetOrbit", ""), mission.get("targetAltitudeKm", 0), mission.get("durationDays", 0), ", ".join(required_names)]
+	objective_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_details.add_theme_color_override("font_color", Color("b7c6d7"))
+	objective_content.add_child(objective_details)
 	var right_scroll := ScrollContainer.new()
-	right_scroll.custom_minimum_size.x = 350
+	right_scroll.custom_minimum_size.x = 400
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	columns.add_child(right_scroll)
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right_scroll.add_child(right)
 	var installed_label := Label.new()
 	installed_label.text = "INSTALLED PARTS"
 	right.add_child(installed_label)
 	var installed_scroll := ScrollContainer.new()
-	installed_scroll.custom_minimum_size.y = 160
+	installed_scroll.custom_minimum_size.y = 240
+	installed_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	installed_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	right.add_child(installed_scroll)
 	_installed_container = VBoxContainer.new()
