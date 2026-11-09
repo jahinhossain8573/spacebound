@@ -5,6 +5,7 @@ func check(ok: bool, message: String) -> void:
 	print(("PASS: " if ok else "FAIL: ") + message)
 	if not ok: failures += 1
 func run_tests() -> void:
+	root.get_node("EventManager").random_enabled = false
 	var gm := root.get_node("GameManager")
 	var data := root.get_node("GlobalData")
 	var sim := root.get_node("FlightSim")

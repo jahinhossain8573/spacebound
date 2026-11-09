@@ -11,6 +11,7 @@ var _execute: Button
 var _apo: Button
 var _peri: Button
 var _busy := false
+var _last_burn: Dictionary = {}
 
 func setup(owner_flight: Control) -> void:
 	flight = owner_flight
@@ -76,10 +77,11 @@ func refresh() -> void:
 	if _value.editable != editable: _value.editable = editable
 
 func execute_burn(amount: float, retrograde: bool) -> bool:
-	if flight.orbit == null or engine.is_empty() or not is_finite(amount) or amount <= 0.0 or amount > remaining_dv() + 0.000001 or flight.power_failed or flight.mission_finished or not flight._skip_result.is_empty() or flight._wait_target >= 0.0: return false
+	if EventManager.blocking or flight.orbit == null or engine.is_empty() or not is_finite(amount) or amount <= 0.0 or amount > remaining_dv() + 0.000001 or flight.power_failed or flight.mission_finished or not flight._skip_result.is_empty() or flight._wait_target >= 0.0: return false
 	var predicted: Dictionary = FlightSim.predict_orbit_burn(flight.orbit, -amount if retrograde else amount)
 	if not predicted.has("orbit"): return false
 	var new_fuel := maxf(0.0, (dry_kg + fuel_kg) * exp(-amount / (engine.ispSeconds * FlightSim.G0)) - dry_kg)
+	_last_burn = {"orbit":flight.orbit.copy(), "dv":amount, "retrograde":retrograde}
 	if not flight.set_orbit(predicted.orbit): return false
 	fuel_kg = new_fuel
 	flight.remaining_propellant_kg = fuel_kg
@@ -124,3 +126,16 @@ func _on_execute() -> void:
 		model.add_child(flame)
 		get_tree().create_timer(0.5).timeout.connect(flame.queue_free)
 	refresh()
+
+func spend_avoidance_fuel(amount: float) -> bool:
+	if engine.is_empty() or amount <= 0.0 or remaining_dv() < amount: return false
+	fuel_kg = maxf(0.0, (dry_kg + fuel_kg) * exp(-amount / (engine.ispSeconds * FlightSim.G0)) - dry_kg)
+	flight.remaining_propellant_kg = fuel_kg
+	refresh()
+	return true
+
+func apply_underperformance() -> bool:
+	if _last_burn.is_empty(): return false
+	var corrected: Dictionary = FlightSim.predict_orbit_burn(_last_burn.orbit, _last_burn.dv * (-0.9 if _last_burn.retrograde else 0.9))
+	if not corrected.has("orbit"): return false
+	return flight.set_orbit(corrected.orbit)

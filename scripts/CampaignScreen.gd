@@ -180,9 +180,21 @@ func _debrief() -> void:
 	if "SpaceX Falcon 9" in receipt.unlocks: _label("SpaceX Falcon 9 now available", null, Color("00e5ff"))
 	_label("Objectives")
 	for objective in GameManager.last_result.get("objectives", []):
-		_label(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
+		_label(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
 	_label("Flight log")
 	for line in receipt.flight_log: _label(str(line))
+	for event_id in receipt.get("events_fired", []):
+		var event: Dictionary = EventManager.get_event(event_id)
+		if event.is_empty(): continue
+		var card := PanelContainer.new()
+		_body.add_child(card)
+		var margin := MarginContainer.new()
+		for edge in ["margin_left", "margin_right", "margin_top", "margin_bottom"]: margin.add_theme_constant_override(edge, 12)
+		card.add_child(margin)
+		var content := VBoxContainer.new()
+		margin.add_child(content)
+		_label("Historical precedent  /  " + str(event.title), content, Color("ffb300"))
+		_label(event.precedent, content)
 	var next := _button("Continue", _return_to_missions)
 	if GameManager.save_campaign() != OK:
 		next.disabled = true

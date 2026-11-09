@@ -6,6 +6,7 @@ func check(ok: bool, label: String) -> void:
 	print(("PASS: " if ok else "FAIL: ") + label)
 	if not ok: failures += 1
 func run_tests() -> void:
+	root.get_node("EventManager").random_enabled = false
 	var manager := root.get_node("GameManager")
 	var data := root.get_node("GlobalData")
 	manager.save_path = "user://spa13-test-%d.json" % Time.get_ticks_usec()

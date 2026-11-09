@@ -1,0 +1,89 @@
+[
+  {
+    "id": "E3",
+    "title": "Solar Array Latch Jam",
+    "severity": "Major",
+    "trigger": "arrival",
+    "probability": 0.06,
+    "conditions": {
+      "requiresPartFlag": "deployable"
+    },
+    "description": "A deployable solar array failed to latch fully; deployable generation is reduced by half.",
+    "choices": [],
+    "precedent": "NASA Lucy (2021). One circular solar array did not fully latch; the mission continued."
+  },
+  {
+    "id": "E7",
+    "title": "Solar Energetic Particle Event / CME",
+    "severity": "Major",
+    "trigger": "skip",
+    "probability": 0.12,
+    "conditions": {},
+    "description": "A solar particle event threatens spacecraft electronics. Non-hardened computers face a 40% chance of burnout.",
+    "choices": [],
+    "precedent": "Galaxy 15 (2010). A commercial GEO satellite stopped responding to commands after a space-weather event."
+  },
+  {
+    "id": "E8",
+    "title": "Orbital Debris Conjunction Warning",
+    "severity": "Major",
+    "trigger": "skip",
+    "probability": 0.08,
+    "conditions": {
+      "targetOrbits": [
+        "LEO",
+        "SSO"
+      ]
+    },
+    "description": "A debris conjunction requires a decision.",
+    "choices": [
+      {
+        "label": "Avoidance burn (10 m/s)",
+        "outcome": "avoid"
+      },
+      {
+        "label": "Accept risk (5% loss)",
+        "outcome": "risk"
+      }
+    ],
+    "precedent": "ISS and Sentinel fleet. Routine debris-avoidance burns."
+  },
+  {
+    "id": "E9",
+    "title": "Monsoon Cloud Cover Blockade",
+    "severity": "Minor",
+    "trigger": "skip",
+    "probability": 0.2,
+    "conditions": {
+      "requiresPartFlag": "optical"
+    },
+    "description": "Monsoon clouds block optical imaging for seven days. Radar can see through clouds.",
+    "choices": [],
+    "precedent": "Copernicus Emergency Management. Optical satellites are blinded by monsoon clouds; radar provides flood maps."
+  },
+  {
+    "id": "E11",
+    "title": "Apogee Engine Isp Underperformance",
+    "severity": "Major",
+    "trigger": "burn",
+    "probability": 0.08,
+    "conditions": {},
+    "description": "The engine delivered 10% less delta-v than planned.",
+    "choices": [],
+    "precedent": "Apollo 11 and Chandrayaan. Propellant reserve margins."
+  },
+  {
+    "id": "E18",
+    "title": "Mission Extension Approval",
+    "severity": "Positive",
+    "trigger": "skip",
+    "probability": 0.1,
+    "conditions": {
+      "requiresSurvival": true,
+      "minimumBatteryPct": 20
+    },
+    "description": "Mission extension approved: +20% of base Science Points.",
+    "choices": [],
+    "precedent": "Voyager, LRO and Opportunity. Missions extended far beyond their planned life."
+  }
+]

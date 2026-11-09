@@ -166,6 +166,7 @@ func compute_score(result: Dictionary) -> Dictionary:
 		bonus += 1
 	if (result.has("dv_reserve_pct") and result.dv_reserve_pct >= 10.0) or "E18" in result.get("events_fired", []):
 		bonus += 1
+	var science_bonus := maxi(0, bonus - 1) if result.get("optical_science_penalty", false) else bonus
 	var efficiency := 0.0
 	if result.has("total_cost_m") and budget > 0:
 		efficiency = 10.0 * clampf((budget - float(result.total_cost_m)) / (budget * 0.3), 0.0, 1.0)
@@ -186,7 +187,7 @@ func compute_score(result: Dictionary) -> Dictionary:
 		outcome = "Success"
 		stars = 3 if score >= 85.0 else (2 if score >= 70.0 else 1)
 		sp_rate = [0.0, 0.7, 0.85, 1.0][stars]
-	var sp: int = floori(float(mission.rewardSciencePoints) * (0.25 if result.get("is_replay", false) else sp_rate + bonus * 0.05))
+	var sp: int = floori(float(mission.rewardSciencePoints) * (0.25 if result.get("is_replay", false) else sp_rate + science_bonus * 0.05 + (0.20 if "E18" in result.get("events_fired", []) else 0.0)))
 	return {"outcome": outcome, "stars": stars, "score": score, "primary": primary, "bonus": bonus * 5.0, "efficiency": efficiency, "mass_margin": margin, "science_points": sp, "funds_millions": float(mission.rewardFundsMillions) * fraction, "mission_number": int(mission.missionNumber)}
 
 func finalize_mission(result: Dictionary) -> Dictionary:
@@ -202,6 +203,7 @@ func finalize_mission(result: Dictionary) -> Dictionary:
 		return {}
 	receipt["attempt_id"] = id
 	receipt["flight_log"] = result.get("flight_log", []).duplicate()
+	receipt["events_fired"] = result.get("events_fired", []).duplicate()
 	receipt["unlocks"] = []
 	funds_millions += receipt.funds_millions
 	science_points += receipt.science_points
@@ -260,6 +262,26 @@ func _create_debug_panel() -> void:
 		debug_force_launch_failure = value
 		if value: toggle.button_pressed = false
 	)
+	var event_id := LineEdit.new()
+	event_id.placeholder_text = "Event ID (E3, E7, E8, E9, E11, E18)"
+	box.add_child(event_id)
+	var event_feedback := Label.new()
+	box.add_child(event_feedback)
+	var force_event := Button.new()
+	force_event.text = "Force event"
+	force_event.pressed.connect(func():
+		event_feedback.text = "" if EventManager.force_event(event_id.text.strip_edges()) else "Enter an unused event ID during a flight."
+	)
+	box.add_child(force_event)
+	var seed_input := SpinBox.new()
+	seed_input.max_value = 2147483647
+	seed_input.step = 1
+	seed_input.prefix = "Event seed: "
+	box.add_child(seed_input)
+	var apply_seed := Button.new()
+	apply_seed.text = "Set event seed"
+	apply_seed.pressed.connect(func(): EventManager.rng.seed = int(seed_input.value))
+	box.add_child(apply_seed)
 	for entry in ["+100 SP", "Unlock all missions", "Unlock all parts", "Unlock all nodes"]:
 		var button := Button.new()
 		button.text = entry

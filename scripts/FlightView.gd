@@ -47,6 +47,7 @@ var _sunlit_pass_started := false
 var _objective_label: Label
 var _beacon_label: Label
 var _skip_beacon_at := -1.0
+var _extension_checked := false
 var _wait_target := -1.0
 var _burn_panel: VBoxContainer
 var remaining_propellant_kg := 0.0
@@ -81,6 +82,8 @@ func _ready() -> void:
 	_view.get_parent().add_child(_burn_panel)
 	_view.get_parent().move_child(_burn_panel, _view.get_index())
 	_burn_panel.setup(self)
+	EventManager.register_flight(self)
+	if power_active: EventManager.roll_trigger("arrival")
 	if shared_launch == null and GameManager.initial_orbit != null and GameManager.flight_elapsed_s > 0:
 		var fade := ColorRect.new()
 		fade.color = Color.BLACK
@@ -231,10 +234,11 @@ func set_orbit(value: OrbitState) -> bool:
 	return true
 
 func set_warp(value: int) -> void:
+	if EventManager.blocking: return
 	if value in WARP_LEVELS: warp = value
 
 func advance_time(real_delta_s: float) -> void:
-	if mission_finished or power_failed or not _skip_result.is_empty() or orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
+	if EventManager.blocking or mission_finished or power_failed or not _skip_result.is_empty() or orbit == null or not is_finite(real_delta_s) or real_delta_s < 0.0: return
 	var elapsed := real_delta_s * warp
 	if _wait_target >= 0.0:
 		var wait_period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
@@ -266,6 +270,7 @@ func advance_time(real_delta_s: float) -> void:
 	_update_position()
 
 func _process(delta: float) -> void:
+	if EventManager.blocking: return
 	_flash_clock += delta
 	if _failure_delay > 0.0:
 		_failure_delay -= delta
@@ -375,6 +380,7 @@ func _view_input(event: InputEvent) -> void:
 			KEY_MINUS, KEY_KP_SUBTRACT: _distance = minf(5000.0, _distance * 1.1)
 
 func _input(event: InputEvent) -> void:
+	if EventManager.blocking: return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M: toggle_map_view()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _dragging = false
 
@@ -406,6 +412,13 @@ func skip_mission_time() -> void:
 	_skip_remaining = maxf(0.0, float(mission.durationDays) * 86400.0 - mission_elapsed_s)
 	# Notify event listeners before reading power totals and computing the result.
 	GameManager.mission_skip_started.emit(_skip_remaining)
+	if EventManager.blocking:
+		EventManager.queue_finished.connect(_continue_skip, CONNECT_ONE_SHOT)
+		return
+	_continue_skip()
+
+func _continue_skip() -> void:
+	if power_failed or mission_finished: return
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 	var fraction := _eclipse_fraction()
 	_skip_result = FlightSim.simulate_mission_skip(_skip_remaining, period, fraction, generation_w, draw_w, battery_capacity_wh, battery_charge_wh, _sun_phase(period, fraction), _sunlit_pass_started)
@@ -441,9 +454,15 @@ func _set_objective(name: String, done: bool) -> void:
 
 func _complete_duration() -> void:
 	if mission_finished: return
+	if not _extension_checked:
+		_extension_checked = true
+		EventManager.roll_extension()
+		if EventManager.blocking:
+			EventManager.queue_finished.connect(_complete_duration, CONNECT_ONE_SHOT)
+			return
 	mission_finished = true
 	_set_objective("Survive mission duration", true)
-	_set_objective("Mission objective", true)
+	if not GameManager.last_result.get("optical_objective_blocked", false): _set_objective("Mission objective", true)
 	GameManager.last_result.flight_log.append("T+%.1fs Mission duration completed" % mission_elapsed_s)
 	_open_debrief()
 
@@ -499,7 +518,7 @@ func _update_objectives() -> void:
 	if _objective_label == null: return
 	var lines: Array[String] = []
 	for objective in GameManager.last_result.get("objectives", []):
-		lines.append(("✓ " if objective.get("done", false) else "○ ") + str(objective.get("name", "")))
+		lines.append(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
 	_objective_label.text = "  |  ".join(lines)
 
 func wait_for_apsis(apoapsis: bool) -> void:
@@ -507,3 +526,6 @@ func wait_for_apsis(apoapsis: bool) -> void:
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 	_wait_target = period * 0.5 if apoapsis else 0.0
 	warp = 1000
+
+func _exit_tree() -> void:
+	EventManager.unregister_flight(self)
