@@ -58,6 +58,10 @@ Mission skipping starts from the current battery charge and orbital phase, proce
 
 Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and the project startup smoke check pass.
 
+## 3D assets
+
+Models follow [the 3D asset specification](docs/art/3d-asset-spec.md): real-scale `.glb` files at `assets/models/<category>/<id>.glb`, with Blender sources in `art_source/`, which Godot ignores. Export with `art_source/tools/sb_export.py` and load through `scripts/ModelLibrary.gd`, which returns `null` until a model exists. After importing (`godot --headless --path . --import`), run `godot --headless --path . --script res://tests/test_models.gd` to check every delivered model against the spec.
+
 ## Workshop preview
 
 Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch is enabled when the readiness review has no failures.

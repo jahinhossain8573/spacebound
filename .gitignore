@@ -4,3 +4,7 @@
 
 # Exported builds and packages
 /build/
+
+# Blender backups and Python caches
+*.blend1
+__pycache__/
