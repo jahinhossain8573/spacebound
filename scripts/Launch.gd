@@ -2,6 +2,8 @@ extends Control
 
 const ASCENT_SECONDS := 15.0
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
+const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
 var rng := RandomNumberGenerator.new()
 var countdown := 10.0
 var elapsed := 0.0
@@ -14,11 +16,16 @@ var fairing_separated := false
 var can_skip := false
 var reliability := 0.0
 var rocket_height := 18.0
+## Height above the rocket's base that the camera looks at; it rises to the upper stack at staging.
+var focus_height := 9.0
+var _upper_focus := 13.5
 var _root3d: Node3D
 var _rocket: Node3D
 var _stage: Node3D
 var _fairing_left: Node3D
 var _fairing_right: Node3D
+var _upper_flame: MeshInstance3D
+var _payload: Node3D
 var _camera: Camera3D
 var _flash: MeshInstance3D
 var _status: Label
@@ -62,6 +69,8 @@ func _ready() -> void:
 		return
 	can_skip = GameManager.has_launched_once
 	rocket_height = {"launcher_electron":18.0, "launcher_vega_c":35.0, "launcher_falcon_9":70.0}.get(build.launcher.id, 18.0)
+	focus_height = rocket_height * 0.5
+	_upper_focus = rocket_height * 0.75
 	rng.randomize()
 	_create_world()
 
@@ -149,6 +158,7 @@ func _create_world() -> void:
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.environment.ambient_light_color = Color("8192a8")
 	env.environment.ambient_light_energy = 0.7
+	MODEL_LIBRARY.use_sky_reflections(env.environment)
 	_root3d.add_child(env)
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45,-25,0)
@@ -166,10 +176,67 @@ func _create_world() -> void:
 	_station = Node3D.new()
 	_station.name = "LaunchStation"
 	_root3d.add_child(_station)
-	_box(_station, Vector3(35, 1, 35), Vector3(0,-1,0), Color("454f5b"))
+	_box(_station, Vector3(35, 1, 35), Vector3(0,-0.5,0), Color("454f5b"))
 	_box(_station, Vector3(2, rocket_height*0.85, 2), Vector3(-rocket_height*0.16,rocket_height*0.425,0), Color("596675"))
 	_rocket = Node3D.new()
 	_root3d.add_child(_rocket)
+	var build: Dictionary = GameManager.current_build
+	var model := MODEL_LIBRARY.instantiate("launchers", build.launcher.id)
+	if model:
+		_assemble_model_rocket(model, build)
+	else:
+		_assemble_primitive_rocket()
+	_flash = MeshInstance3D.new()
+	var flash_mesh := SphereMesh.new()
+	flash_mesh.radius = rocket_height * 0.045
+	flash_mesh.height = rocket_height * 0.09
+	_flash.mesh = flash_mesh
+	_flash.material_override = _material(Color("ffb300"), true)
+	_flash.visible = false
+	_root3d.add_child(_flash)
+	_camera = Camera3D.new()
+	_camera.current = true
+	_camera.near = 0.5
+	_camera.far = 2000000.0
+	_root3d.add_child(_camera)
+	_update_camera()
+
+## Separable sections come from the launcher model; the first stage and interstage fall away
+## together, and the player's spacecraft rides on payload_mount.
+func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
+	_rocket.add_child(model)
+	_stage = Node3D.new()
+	_rocket.add_child(_stage)
+	for section in ["stage_1", "interstage"]:
+		var node := model.get_node_or_null(section)
+		if node:
+			node.reparent(_stage)
+	_fairing_left = model.get_node("fairing_left")
+	_fairing_right = model.get_node("fairing_right")
+	var upper_stage := model.get_node_or_null("stage_2") as Node3D
+	if upper_stage:
+		_upper_focus = (upper_stage.position.y + rocket_height) / 2.0
+	_add_flame(_stage, _stage.find_child("exhaust_stage_1", true, false) as Node3D).name = "Flame"
+	var upper := model.find_child("exhaust_stage_2", true, false) as Node3D
+	if upper:
+		_upper_flame = _add_flame(upper.get_parent() as Node3D, upper, 0.35)
+	var mount := model.find_child("payload_mount", true, false) as Node3D
+	_payload = SPACECRAFT.build(build.bus, build.installed_components)
+	if mount and _payload:
+		_payload.name = "Payload"
+		mount.add_child(_payload)
+		_payload.transform = Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3(0, SPACECRAFT.dimensions_of(build.bus).z / 2.0, 0))
+
+func _add_flame(parent: Node3D, exhaust: Node3D, size := 1.0) -> MeshInstance3D:
+	var height := rocket_height * 0.12 * size
+	var flame := _cylinder(parent, rocket_height * 0.027 * size, height, 0.0, Color("ffb300"), true)
+	flame.position = parent.to_local(exhaust.global_position) + Vector3(0, -height / 2.0, 0)
+	flame.rotation.z = PI
+	flame.material_override = _material(Color("ffb300"), true)
+	flame.visible = false
+	return flame
+
+func _assemble_primitive_rocket() -> void:
 	var radius := rocket_height * 0.045
 	_stage = Node3D.new()
 	_rocket.add_child(_stage)
@@ -192,20 +259,6 @@ func _create_world() -> void:
 	flame.material_override = _material(Color("ffb300"), true)
 	flame.name = "Flame"
 	flame.visible = false
-	_flash = MeshInstance3D.new()
-	var flash_mesh := SphereMesh.new()
-	flash_mesh.radius = radius
-	flash_mesh.height = radius*2
-	_flash.mesh = flash_mesh
-	_flash.material_override = _material(Color("ffb300"), true)
-	_flash.visible = false
-	_root3d.add_child(_flash)
-	_camera = Camera3D.new()
-	_camera.current = true
-	_camera.near = 0.5
-	_camera.far = 2000000.0
-	_root3d.add_child(_camera)
-	_update_camera()
 
 func calculate_reliability(base: float, nodes: Array) -> float:
 	var result := base
@@ -295,6 +348,8 @@ func _process_milestones(time: float) -> void:
 		stage_separated = true
 		_stage.reparent(_root3d, true)
 		_stage.get_node("Flame").visible = false
+		if _upper_flame: _upper_flame.visible = true
+		create_tween().tween_property(self, "focus_height", _upper_focus, 2.0)
 		create_tween().tween_property(_stage,"position:y",_stage.position.y-rocket_height*2,4.0)
 		_log("Stage separation nominal.", 6.0)
 	if not fairing_separated and time >= 0.6*ASCENT_SECONDS:
@@ -344,6 +399,10 @@ func _finish_success() -> void:
 	initial.arg_periapsis_rad = INSERTION_ANGLE
 	GameManager.initial_orbit = initial
 	_station.visible = false
+	if _upper_flame: _upper_flame.visible = false
+	if _payload:
+		for player: AnimationPlayer in _payload.find_children("*", "AnimationPlayer", true, false):
+			if player.has_animation("deploy"): player.play("deploy")
 	_handoff_to_flight()
 
 func _handoff_to_flight() -> void:
@@ -362,8 +421,11 @@ func _log(message: String, at: float = -1.0) -> void:
 	var seconds := int(elapsed if at < 0 else at)
 	GameManager.last_result.flight_log.append("T+%02d:%02d %s" % [seconds / 60, seconds % 60, message])
 
+func focus_point() -> Vector3:
+	return _rocket.transform * Vector3(0, focus_height, 0)
+
 func _update_camera() -> void:
-	var target := _rocket.position + Vector3(0,rocket_height*0.5,0)
+	var target := focus_point()
 	_camera.position = target + Vector3(sin(_camera_yaw)*cos(_camera_pitch), sin(_camera_pitch), cos(_camera_yaw)*cos(_camera_pitch)) * rocket_height * _camera_distance
 	_camera.look_at(target,Vector3.UP)
 

@@ -27,6 +27,9 @@ var _distance := 5.0
 var _dragging := false
 var _dimensions := Vector3.ONE
 var _stats_helper = preload("res://scripts/BuildStats.gd").new()
+const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
+var _mounts: Dictionary = {}
 var _telemetry: VBoxContainer
 var _launch: Button
 var _notice: Label
@@ -203,6 +206,7 @@ func _make_world() -> void:
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("b4c2d9")
 	environment.ambient_light_energy = 0.7
+	MODEL_LIBRARY.use_sky_reflections(environment)
 	env.environment = environment
 	world.add_child(env)
 	var light := DirectionalLight3D.new()
@@ -228,13 +232,21 @@ func _make_world() -> void:
 	_craft = Node3D.new()
 	_craft.scale = Vector3.ONE * (2.0 / maxf(_dimensions.x, maxf(_dimensions.y, _dimensions.z)))
 	world.add_child(_craft)
+	_attachments = Node3D.new()
+	_attachments.name = "Attachments"
+	var model := MODEL_LIBRARY.instantiate("buses", bus.id)
+	if model:
+		model.name = "Bus"
+		_craft.add_child(model)
+		_craft.add_child(_attachments)
+		_mounts = SPACECRAFT.mounts_of(model)
+		_reset_camera()
+		return
 	var box := CSGBox3D.new()
 	box.name = "Bus"
 	box.size = _dimensions
 	box.material = _material(Color("d5d9de"))
 	_craft.add_child(box)
-	_attachments = Node3D.new()
-	_attachments.name = "Attachments"
 	_craft.add_child(_attachments)
 	for marker in {"mount_top": Vector3(0, _dimensions.y/2, 0), "mount_bottom": Vector3(0, -_dimensions.y/2, 0), "mount_front": Vector3(0, 0, -_dimensions.z/2), "mount_back": Vector3(0, 0, _dimensions.z/2), "mount_left": Vector3(-_dimensions.x/2, 0, 0), "mount_right": Vector3(_dimensions.x/2, 0, 0), "array_hinge_left": Vector3(-_dimensions.x/2, 0, 0), "array_hinge_right": Vector3(_dimensions.x/2, 0, 0), "engine_mount": Vector3(0, -_dimensions.y/2, 0)}:
 		var point := Marker3D.new()
@@ -251,6 +263,7 @@ func _make_world() -> void:
 		elif marker in ["mount_right", "array_hinge_right"]:
 			point.rotation.z = -PI / 2.0
 		_craft.add_child(point)
+		_mounts[marker] = point
 	_reset_camera()
 
 func _material(color: Color) -> StandardMaterial3D:
@@ -403,6 +416,7 @@ func _refresh_build() -> void:
 		child.queue_free()
 	_visuals.clear()
 	var wing := 0
+	var occupied := {}
 	for i in installed_components.size():
 		var part := installed_components[i]
 		var visual := Node3D.new()
@@ -410,6 +424,11 @@ func _refresh_build() -> void:
 		_attachments.add_child(visual)
 		_visuals.append(visual)
 		var d := _dimensions
+		var models := SPACECRAFT.place_part(part, _mounts, occupied, d)
+		for instance in models:
+			visual.add_child(instance)
+		if not models.is_empty():
+			continue
 		if part.id == "pwr_gomspace_p31u":
 			_box(visual, Vector3(d.x*0.85,d.y*0.85,d.z*0.03), Vector3(0,0,-d.z*0.52), Color("173f79"))
 			_box(visual, Vector3(d.x*0.85,d.y*0.85,d.z*0.03), Vector3(0,0,d.z*0.52), Color("173f79"))

@@ -375,7 +375,7 @@ func _update_camera() -> void:
 		_camera.far = 100000000.0 if _map_view else 2000000.0
 	var target := _marker.position if _camera_mode == "Spacecraft" else Vector3.ZERO
 	if is_instance_valid(_shared_rocket):
-		target = _shared_rocket.position + Vector3(0, shared_launch.rocket_height * 0.5, 0) if _camera_mode == "Spacecraft" else _shared_center
+		target = shared_launch.focus_point() if _camera_mode == "Spacecraft" else _shared_center
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
 
@@ -389,7 +389,7 @@ func _view_input(event: InputEvent) -> void:
 		if event.pressed: _view.grab_focus()
 		if event.button_index == MOUSE_BUTTON_RIGHT: _dragging = event.pressed
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 5.0 if shared_launch != null else 0.06, 100000000.0 if shared_launch != null else 5000.0)
+			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 1.5 if shared_launch != null else 0.06, 100000000.0 if shared_launch != null else 5000.0)
 	elif event is InputEventMouseMotion and _dragging:
 		_yaw -= event.relative.x * 0.01
 		_pitch = clampf(_pitch + event.relative.y * 0.01, -1.4, 1.4)

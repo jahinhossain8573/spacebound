@@ -17,6 +17,8 @@ func run_tests() -> void:
 	var launch = scene.instantiate()
 	root.add_child(launch)
 	launch.set_process(false)
+	check(launch._payload != null and launch._payload.get_parent().name == "payload_mount", "spacecraft rides on the Electron payload mount")
+	check(launch._stage.get_node_or_null("stage_1") != null and launch._stage.get_node_or_null("interstage") != null and launch._fairing_left.name == "fairing_left", "model sections drive staging")
 	check(is_equal_approx(launch.calculate_reliability(0.95,["L7","L8","L9"]),0.99), "reliability capped")
 	check(is_equal_approx(launch.calculate_reliability(0.88,["L7","L9"]),0.92), "owned reliability nodes")
 	manager.debug_disable_reliability = true
@@ -32,13 +34,15 @@ func run_tests() -> void:
 	check(not launch._station.visible, "station disappears during ascent")
 	launch.advance_ascent(6.0)
 	check(launch.finished and manager.last_result.launched and manager.last_result.objectives[0].done and manager.initial_orbit.semi_major_axis_km == 6771.0 and manager.flight_elapsed_s == 15.0, "successful LEO handoff")
+	var antenna := launch._payload.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	check(antenna.is_playing() and antenna.current_animation == "deploy", "antenna deploys at orbit insertion")
 	var shared = launch._flight
 	var rocket = launch._rocket
 	var camera = launch._camera
 	var position: Vector3 = rocket.position
 	var expected := Vector3(6771000.0 * sin(0.02), 6771000.0 * cos(0.02) - 6371000.0, 0)
 	check(position.distance_to(expected) < 2.0, "insertion matches ascent endpoint")
-	var target: Vector3 = position + Vector3(0, launch.rocket_height * 0.5, 0)
+	var target: Vector3 = launch.focus_point()
 	var camera_offset: Vector3 = Vector3(sin(launch._camera_yaw)*cos(launch._camera_pitch),sin(launch._camera_pitch),cos(launch._camera_yaw)*cos(launch._camera_pitch)) * launch.rocket_height * launch._camera_distance
 	check(camera.position.distance_to(target + camera_offset) < 2.0, "camera retains ascent framing")
 	check(shared != null and shared._view == launch._launch_view and shared._camera == camera and shared._shared_rocket == rocket, "orbit reuses launch world, spacecraft and camera")
