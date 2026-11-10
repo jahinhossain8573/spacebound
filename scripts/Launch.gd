@@ -225,7 +225,8 @@ func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
 	if mount and _payload:
 		_payload.name = "Payload"
 		mount.add_child(_payload)
-		_payload.transform = Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3(0, SPACECRAFT.dimensions_of(build.bus).z / 2.0, 0))
+		# Front end up, so end-mounted antennas deploy clear of the payload adapter.
+		_payload.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, SPACECRAFT.dimensions_of(build.bus).z / 2.0, 0))
 
 func _add_flame(parent: Node3D, exhaust: Node3D, size := 1.0) -> MeshInstance3D:
 	var height := rocket_height * 0.12 * size

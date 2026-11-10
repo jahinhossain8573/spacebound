@@ -18,6 +18,7 @@ func run_tests() -> void:
 	root.add_child(launch)
 	launch.set_process(false)
 	check(launch._payload != null and launch._payload.get_parent().name == "payload_mount", "spacecraft rides on the Electron payload mount")
+	check(launch._payload.get_node("mount_front").global_position.y > launch._payload.global_position.y + 0.1, "spacecraft front end faces away from the adapter")
 	check(launch._stage.get_node_or_null("stage_1") != null and launch._stage.get_node_or_null("interstage") != null and launch._fairing_left.name == "fairing_left", "model sections drive staging")
 	check(is_equal_approx(launch.calculate_reliability(0.95,["L7","L8","L9"]),0.99), "reliability capped")
 	check(is_equal_approx(launch.calculate_reliability(0.88,["L7","L9"]),0.92), "owned reliability nodes")
