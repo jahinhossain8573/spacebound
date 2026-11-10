@@ -48,6 +48,7 @@ func check_rule_violations(data: Node) -> void:
 	(bus.find_child("body", true, false) as Node3D).scale.x = 2.0
 	(bus.find_child("mount_front", true, false) as Node3D).rotation = Vector3.ZERO
 	bus.find_child("engine_mount", true, false).free()
+	(bus.find_child("mount_bottom", true, false) as Node3D).rotate_object_local(Vector3.UP, PI / 2)
 	var rails := bus.find_children("rail_*", "MeshInstance3D", true, false)
 	for i in 2:
 		var extra := StandardMaterial3D.new()
@@ -59,6 +60,7 @@ func check_rule_violations(data: Node) -> void:
 	check(has_error(result, "the game data says"), "oversized bus rejected")
 	check(has_error(result, "'mount_front' +Y points"), "misaligned mount rejected")
 	check(has_error(result, "missing empty 'engine_mount'"), "missing empty rejected")
+	check(has_error(result, "'mount_bottom' is rolled"), "rolled mount rejected")
 	check(has_error(result, "materials; the limit is 3"), "fourth material rejected")
 	check(has_error(result, "animation loops"), "looping deploy rejected")
 	bus.free()
@@ -78,10 +80,14 @@ func check_delivered_models(data: Node) -> void:
 		check(folder in MODEL_LIBRARY.CATEGORIES, "assets/models/%s is a known category" % folder)
 	for category: String in MODEL_LIBRARY.CATEGORIES:
 		var folder := MODELS_DIR.path_join(category)
-		for file in DirAccess.get_files_at(folder):
+		var files := DirAccess.get_files_at(folder)
+		for file in files:
 			if file.ends_with(".import") or file.begins_with("."):
 				continue
 			var label := "%s/%s" % [category, file]
+			if file.get_extension() in ["png", "jpg"] and _extracted_from_model(file, files):
+				total_bytes += FileAccess.get_file_as_bytes(folder.path_join(file)).size()
+				continue
 			if file.get_extension() != "glb" or not file.get_basename().is_valid_identifier() or file.get_basename() != file.get_basename().to_lower():
 				check(false, "%s must be a .glb named after a snake_case id" % label)
 				continue
@@ -105,3 +111,10 @@ func check_delivered_models(data: Node) -> void:
 			check(result.errors.is_empty(), "%s meets the spec (%d triangles, %s m) %s" % [label, result.triangles, result.size, result.errors])
 			model.free()
 	check(total_bytes <= MAX_TOTAL_BYTES, "%d models use %.1f of %d MB" % [count, total_bytes / 1048576.0, MAX_TOTAL_BYTES / 1048576])
+
+## Godot's glTF importer extracts embedded textures next to the model as <id>_<image>.
+func _extracted_from_model(file: String, files: PackedStringArray) -> bool:
+	for other in files:
+		if other.get_extension() == "glb" and file.begins_with(other.get_basename() + "_"):
+			return true
+	return false

@@ -87,6 +87,19 @@ def crinkle_normal_texture(size=512):
     return normal * 0.5 + 0.5
 
 
+def weave_normal_texture(size=512, tows=8):
+    """Tileable 2 x 2 twill carbon weave: alternating warp and weft tows, each a rounded bump."""
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    tow = size / tows
+    fx, fy = (xs % tow) / tow, (ys % tow) / tow
+    warp_on_top = ((xs // tow + ys // tow) // 2 % 2) == 0
+    height = np.where(warp_on_top, np.sin(np.pi * fx) * (0.7 + 0.3 * np.sin(np.pi * fy)), np.sin(np.pi * fy) * (0.7 + 0.3 * np.sin(np.pi * fx)))
+    dy, dx = np.gradient(height)
+    normal = np.stack([-dx * 6.0, -dy * 6.0, np.ones_like(height)], axis=2)
+    normal /= np.linalg.norm(normal, axis=2, keepdims=True)
+    return normal * 0.5 + 0.5
+
+
 def nozzle_texture(size=256):
     """Dark metal that warms to a burnt bronze rim. V = 0 at the throat, V = 1 at the exit rim."""
     v = np.linspace(0.0, 1.0, size, dtype=np.float32)[:, None, None]
@@ -134,8 +147,9 @@ def build():
     solar = save_image("sb_solar_cell_color", solar_cell_texture(), "sRGB", "JPEG")
     crinkle = save_image("sb_mli_normal", crinkle_normal_texture(), "Non-Color", "PNG")
     nozzle = save_image("sb_nozzle_color", nozzle_texture(), "sRGB", "JPEG")
+    weave = save_image("sb_composite_normal", weave_normal_texture(), "Non-Color", "PNG")
     principled("sb_white_paint", "e9e7e1", roughness=0.6)
-    principled("sb_black_composite", "1c1d20", roughness=0.5)
+    principled("sb_black_composite", "1c1d20", roughness=0.5, normal_image=weave, normal_strength=0.3)
     principled("sb_mli_gold", "c9a23a", metallic=1.0, roughness=0.35, normal_image=crinkle)
     principled("sb_mli_silver", "c8ccd0", metallic=1.0, roughness=0.35, normal_image=crinkle)
     principled("sb_solar_cell", roughness=0.25, color_image=solar)

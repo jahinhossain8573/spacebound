@@ -96,6 +96,7 @@ Empties become `Node3D` nodes in Godot. Use these exact snake_case names, withou
   | `array_hinge_right` | Where the right solar wing attaches | +X |
   | `engine_mount` | Centre of the bottom face | −Z |
 
+  Parts mounted on a face take the empty's whole orientation, so its roll matters too. Turn each empty only as far as it needs: every empty except `mount_front` and `mount_back` keeps its Godot Z axis along the bus's Z axis (Blender: local Y along the bus's Y), and `mount_front` and `mount_back` keep their X axis along the bus's X axis. For `mount_bottom` and `engine_mount`, that is a 180° rotation about X.
 - **Rockets:** the origin is at the centre of the base, on the ground. Separable sections are separate child objects:
   - `stage_1`, `stage_2` (and so on), `interstage` if present, `fairing_left` and `fairing_right`. Together the two fairing halves match `fairingDiameterMeters` and `fairingHeightMeters` in `data/launchers.json` within 10%.
   - `payload_mount`: where the spacecraft sits, inside the fairing.
@@ -127,6 +128,8 @@ Import new files, then run the model checks:
 godot --headless --path . --import
 godot --headless --path . --script res://tests/test_models.gd
 ```
+
+On import, Godot extracts each model's embedded textures next to it as `<id>_<texture>.png` or `.jpg`. Commit those files and their `.import` files with the model.
 
 The checks load every file under `assets/models`. They verify triangle and texture budgets, materials, required empties and their directions, bus and fairing sizes against the game data, `deploy` animations, and the 25 MB total. `tests/fixtures/models/buses/bus_spec_fixture.glb`, rebuilt by `art_source/tools/build_fixture.py`, proves the Blender-to-Godot axis conversion on every run.
 

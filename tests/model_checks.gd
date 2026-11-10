@@ -100,6 +100,11 @@ static func _check_bus(root: Node3D, bounds: AABB, record: Dictionary, errors: A
 		var transform := _relative(root, node)
 		if transform.basis.y.normalized().dot(direction) < AXIS_TOLERANCE:
 			errors.append("'%s' +Y points %s; it must point %s" % [empty_name, _format(transform.basis.y.normalized()), _format(direction)])
+		elif empty_name in ["mount_front", "mount_back"]:
+			if absf(transform.basis.x.normalized().x) < AXIS_TOLERANCE:
+				errors.append("'%s' is rolled; its X axis must stay along the bus X axis" % empty_name)
+		elif absf(transform.basis.z.normalized().z) < AXIS_TOLERANCE:
+			errors.append("'%s' is rolled; its Z axis must stay along the bus Z axis" % empty_name)
 		var face := maxf(bounds.end.dot(direction), bounds.position.dot(direction))
 		var along := transform.origin.dot(direction)
 		if empty_name.begins_with("array_hinge"):
