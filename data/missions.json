@@ -123,9 +123,9 @@
   {
     "missionNumber": 4,
     "id": "mission_4",
-    "title": "Geostationary Gateway: Bangabandhu Satellite-1",
+    "title": "Geostationary Gateway: Bangladesh Satellite-1",
     "briefing": "Build a communications satellite and circularize its orbit at geostationary altitude. Operate it for one year.",
-    "historyNote": "Bangabandhu Satellite-1 was built by Thales Alenia Space on a Spacebus 4000B2 platform and operates at 119.1° East.",
+    "historyNote": "Bangladesh Satellite-1 was built by Thales Alenia Space on a Spacebus 4000B2 platform and operates at 119.1° East.",
     "targetOrbit": "GEO",
     "targetAltitudeKm": 35786,
     "durationDays": 365,

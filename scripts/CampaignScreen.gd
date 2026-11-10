@@ -26,7 +26,7 @@ func _ready() -> void:
 	_body.add_theme_constant_override("separation", 14)
 	scroll.add_child(_body)
 	_error_label = Label.new()
-	_error_label.add_theme_color_override("font_color", Color("ff4d4d"))
+	_error_label.add_theme_color_override("font_color", Color("ff8811"))
 	_body.add_child(_error_label)
 	_retry = Button.new()
 	_retry.text = "Retry save"
@@ -60,7 +60,7 @@ func _show_save_error(action: Callable) -> void:
 
 func _main_menu() -> void:
 	GameManager.state = GameManager.State.MAIN_MENU
-	_label("SPACEBOUNDS", null, Color("00e5ff")).add_theme_font_size_override("font_size", 48)
+	_label("SPACEBOUNDS", null, Color("279af1")).add_theme_font_size_override("font_size", 48)
 	_label("Build a spacecraft. Explore our world and beyond.")
 	_button("New Campaign", _new_campaign)
 	if FileAccess.file_exists(GameManager.save_path):
@@ -105,7 +105,7 @@ func _credits() -> void:
 
 func _mission_select() -> void:
 	GameManager.state = GameManager.State.MISSION_SELECT
-	_label("MISSION SELECT", null, Color("00e5ff")).add_theme_font_size_override("font_size", 36)
+	_label("MISSION SELECT", null, Color("279af1")).add_theme_font_size_override("font_size", 36)
 	_balance_label = _label("")
 	GameManager.campaign_changed.connect(_refresh_campaign_ui)
 	var columns := HBoxContainer.new()
@@ -135,9 +135,9 @@ func _select_mission(mission: Dictionary) -> void:
 	if mission.is_empty(): return
 	_selected = mission
 	for child in _details.get_children(): child.queue_free()
-	_label(mission.title, _details, Color("00e5ff"))
+	_label(mission.title, _details, Color("279af1"))
 	_label(mission.briefing, _details)
-	if mission.has("historyNote"): _label("History note: " + mission.historyNote, _details, Color("ffb300"))
+	if mission.has("historyNote"): _label("History note: " + mission.historyNote, _details, Color("ff8811"))
 	_label("%s · %s km · %s days" % [mission.targetOrbit, mission.targetAltitudeKm, mission.durationDays], _details)
 	var names: Array[String] = []
 	for id in mission.requiredPartIds:
@@ -147,7 +147,7 @@ func _select_mission(mission: Dictionary) -> void:
 	var missing: Array[String] = []
 	if not GameManager.is_part_unlocked(mission.requiredLauncher): missing.append(str(GlobalData.get_launcher(mission.requiredLauncher).get("name", mission.requiredLauncher)))
 	if not GameManager.is_part_unlocked(mission.requiredBus): missing.append(str(GlobalData.get_bus(mission.requiredBus).get("name", mission.requiredBus)))
-	if not missing.is_empty(): _label("Research required: " + ", ".join(missing), _details, Color("ffb300"))
+	if not missing.is_empty(): _label("Research required: " + ", ".join(missing), _details, Color("ff8811"))
 	_start_button = _button("Start", _start_selected, _details)
 	_start_button.disabled = not GameManager.is_mission_unlocked(int(mission.missionNumber)) or not missing.is_empty()
 
@@ -157,7 +157,7 @@ func _start_selected() -> void:
 
 func _debrief() -> void:
 	GameManager.state = GameManager.State.DEBRIEF
-	_label("FLIGHT DEBRIEF", null, Color("00e5ff")).add_theme_font_size_override("font_size", 36)
+	_label("FLIGHT DEBRIEF", null, Color("279af1")).add_theme_font_size_override("font_size", 36)
 	if GameManager.last_result.is_empty():
 		_label("No flight result is available.")
 		_button("Continue", _return_to_missions)
@@ -176,15 +176,15 @@ func _debrief() -> void:
 		bar.show_percentage = false
 		_body.add_child(bar)
 	_label("Payout: $%.2fM and %d SP" % [receipt.funds_millions, receipt.science_points])
-	if not receipt.unlocks.is_empty(): _label("Unlocked: " + ", ".join(receipt.unlocks), null, Color("ffb300"))
-	if "SpaceX Falcon 9" in receipt.unlocks: _label("SpaceX Falcon 9 now available", null, Color("00e5ff"))
+	if not receipt.unlocks.is_empty(): _label("Unlocked: " + ", ".join(receipt.unlocks), null, Color("ff8811"))
+	if "SpaceX Falcon 9" in receipt.unlocks: _label("SpaceX Falcon 9 now available", null, Color("279af1"))
 	_label("Objectives")
 	for objective in GameManager.last_result.get("objectives", []):
 		_label(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
 	if receipt.has("images_captured"): _label("Images captured: %d" % receipt.images_captured)
 	if receipt.has("clear_observation_s"): _label("Clear observation: %.1f days" % (receipt.clear_observation_s / 86400.0))
 	if int(GameManager.last_result.get("mission_number", 0)) == 3:
-		_label("Intense Flooding in Bangladesh — July 25, 2020", null, Color("00e5ff"))
+		_label("Intense Flooding in Bangladesh — July 25, 2020", null, Color("279af1"))
 		var flood_image := TextureRect.new()
 		flood_image.texture = load("res://assets/images/nasa/bangladesh_flood.jpg")
 		flood_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -205,7 +205,7 @@ func _debrief() -> void:
 		card.add_child(margin)
 		var content := VBoxContainer.new()
 		margin.add_child(content)
-		_label("Historical precedent  /  " + str(event.title), content, Color("ffb300"))
+		_label("Historical precedent  /  " + str(event.title), content, Color("ff8811"))
 		_label(event.precedent, content)
 	var next := _button("Continue", _return_to_missions)
 	if GameManager.save_campaign() != OK:

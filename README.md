@@ -1,6 +1,6 @@
 # spacebounds
 
-Open `project.godot` with Godot 4.3 stable or newer and run the project. The project uses the Compatibility renderer for web support.
+Open `project.godot` with Godot 4.7.2 stable (Steam) and run the project. The project uses the Compatibility renderer for web support.
 
 The default UI theme uses Roboto, licensed under the SIL Open Font License; see `assets/fonts/OFL.txt`. Theme colors are available under the `Spacebounds` type as `accent`, `warning`, and `failure`.
 
@@ -85,6 +85,7 @@ Run `godot --path . res://scenes/FlightView.tscn` (or F6 in the editor). It prev
 `GameManager.initial_orbit` accepts an `OrbitState` handoff; FlightView copies it. `FlightView.set_orbit()` validates and redraws an orbit without resetting total elapsed time. Lunar missions require their dedicated flight scenes.
 
 Run `godot --headless --path . --script res://tests/test_orbit.gd`. All orbit and existing regression suites pass on Godot 4.7.2. Native rendering was captured in `build/checks/flight-native.png`; Web rendering, warp, camera presets, keyboard rotation, and the eclipse indicator were visually checked. Browser resizing and native interactive controls remain unverified.
+
 ## Launch sequence
 
 A ready Workshop build opens the launch countdown. Press Space or Launch now to ignite; subsequent successful launches can skip the ascent. Failed launches cannot be skipped. In debug builds, F9 offers mutually exclusive reliability overrides. Lunar destinations remain unavailable until their dedicated scenes exist.

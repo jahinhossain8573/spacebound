@@ -62,7 +62,7 @@ func _make_ui() -> void:
 	var title := Label.new()
 	title.text = "  WORKSHOP   /   " + str(mission.title) + "\n  " + str(launcher.name) + "   •   " + str(bus.name)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_color_override("font_color", Color("00e5ff"))
+	title.add_theme_color_override("font_color", Color("279af1"))
 	header.add_child(title)
 	var reset := Button.new()
 	reset.text = "Reset view"
@@ -116,7 +116,7 @@ func _make_ui() -> void:
 	objective_margin.add_child(objective_content)
 	var objective_title := Label.new()
 	objective_title.text = "MISSION OBJECTIVE  /  " + str(mission.title)
-	objective_title.add_theme_color_override("font_color", Color("00e5ff"))
+	objective_title.add_theme_color_override("font_color", Color("279af1"))
 	objective_content.add_child(objective_title)
 	var objective_brief := Label.new()
 	objective_brief.text = str(mission.get("briefing", ""))
@@ -126,7 +126,7 @@ func _make_ui() -> void:
 		var history := Label.new()
 		history.text = "History: " + str(mission.historyNote)
 		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		history.add_theme_color_override("font_color", Color("ffb300"))
+		history.add_theme_color_override("font_color", Color("ff8811"))
 		objective_content.add_child(history)
 	var required_names: Array[String] = []
 	for part_id in mission.get("requiredPartIds", []):
@@ -134,7 +134,7 @@ func _make_ui() -> void:
 	var objective_details := Label.new()
 	objective_details.text = "%s  ·  %s km  ·  %s days\nRequired: %s" % [mission.get("targetOrbit", ""), mission.get("targetAltitudeKm", 0), mission.get("durationDays", 0), ", ".join(required_names)]
 	objective_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_details.add_theme_color_override("font_color", Color("b7c6d7"))
+	objective_details.add_theme_color_override("font_color", Color("ffffff"))
 	objective_content.add_child(objective_details)
 	var right_scroll := ScrollContainer.new()
 	right_scroll.custom_minimum_size.x = 400
@@ -180,7 +180,7 @@ func _make_ui() -> void:
 	_fuel_box.add_child(fill)
 	_message = Label.new()
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.add_theme_color_override("font_color", Color("ffb300"))
+	_message.add_theme_color_override("font_color", Color("ff8811"))
 	_fuel_box.add_child(_message)
 	_notice = Label.new()
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -385,7 +385,7 @@ func _refresh_build() -> void:
 		if indices.is_empty(): continue
 		var heading := Label.new()
 		heading.text = category.to_upper().replace("_", " ")
-		heading.add_theme_color_override("font_color", Color("00e5ff"))
+		heading.add_theme_color_override("font_color", Color("279af1"))
 		_installed_container.add_child(heading)
 		for index in indices:
 			var row := HBoxContainer.new()
@@ -518,7 +518,7 @@ func _add_telemetry(title: String, text: String, used: float, limit: float, chec
 	var status := "PASS"
 	for item in review:
 		if item.check == check_name: status = item.status
-	var color := Color("ff4d4d") if status == "FAIL" else (Color("ffb300") if status == "ADVISORY" or (is_finite(limit) and limit > 0.0 and used >= limit * 0.9) else Color("55d785"))
+	var color := Color("ff8811") if status == "FAIL" else (Color("ff8811") if status == "ADVISORY" or (is_finite(limit) and limit > 0.0 and used >= limit * 0.9) else Color("279af1"))
 	var label := Label.new()
 	label.text = title + ": " + text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -548,7 +548,7 @@ func _show_review() -> void:
 		label.text = "%s — %s: %s" % [item.status, item.check, item.message]
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = 600
-		label.add_theme_color_override("font_color", Color("ff4d4d") if item.status == "FAIL" else (Color("ffb300") if item.status == "ADVISORY" else Color("55d785")))
+		label.add_theme_color_override("font_color", Color("ff8811") if item.status == "FAIL" else (Color("ff8811") if item.status == "ADVISORY" else Color("279af1")))
 		container.add_child(label)
 	dialog.close_requested.connect(dialog.queue_free)
 	dialog.confirmed.connect(dialog.queue_free)

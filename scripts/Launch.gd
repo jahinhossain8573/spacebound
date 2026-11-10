@@ -87,10 +87,10 @@ func _create_ui() -> void:
 	_skip.pressed.connect(skip_ascent)
 	bar.add_child(_skip)
 	_status = Label.new()
-	_status.add_theme_color_override("font_color", Color("00e5ff"))
+	_status.add_theme_color_override("font_color", Color("279af1"))
 	layout.add_child(_status)
 	_warning = Label.new()
-	_warning.add_theme_color_override("font_color", Color("ffb300"))
+	_warning.add_theme_color_override("font_color", Color("ff8811"))
 	layout.add_child(_warning)
 	_save_retry = Button.new()
 	_save_retry.text = "Retry campaign save"
@@ -311,7 +311,7 @@ func skip_ascent() -> void:
 
 func _explode() -> void:
 	_status.text = "LAUNCH FAILURE"
-	_status.add_theme_color_override("font_color", Color("ff4d4d"))
+	_status.add_theme_color_override("font_color", Color("ff8811"))
 	_flash.position = _rocket.position
 	_flash.visible = true
 	_rocket.visible = false

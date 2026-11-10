@@ -120,7 +120,7 @@ func _build_scene() -> void:
 	buttons.add_child(_map_button)
 	_add_button(buttons, "Reset view", _reset_view)
 	_hud = Label.new()
-	_hud.add_theme_color_override("font_color", Color("00e5ff"))
+	_hud.add_theme_color_override("font_color", Color("279af1"))
 	layout.add_child(_hud)
 	_objective_label = Label.new()
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -129,7 +129,7 @@ func _build_scene() -> void:
 	_images_label.visible = false
 	layout.add_child(_images_label)
 	_beacon_label = Label.new()
-	_beacon_label.add_theme_color_override("font_color", Color("00e5ff"))
+	_beacon_label.add_theme_color_override("font_color", Color("279af1"))
 	layout.add_child(_beacon_label)
 	_battery_label = Label.new()
 	layout.add_child(_battery_label)
@@ -141,7 +141,7 @@ func _build_scene() -> void:
 	_skip_button.pressed.connect(skip_mission_time)
 	layout.add_child(_skip_button)
 	_error = Label.new()
-	_error.add_theme_color_override("font_color", Color("ff4d4d"))
+	_error.add_theme_color_override("font_color", Color("ff8811"))
 	layout.add_child(_error)
 	_view = SubViewportContainer.new()
 	_view.stretch = true
@@ -460,7 +460,7 @@ func _update_battery_hud() -> void:
 	if not _skip_result.is_empty(): pct = battery_lowest_pct
 	_battery_bar.value = pct
 	var low := pct < 15.0
-	_battery_bar.modulate = Color("ff4d4d") if low and fmod(_flash_clock, 0.7) < 0.35 else Color.WHITE
+	_battery_bar.modulate = Color("ff8811") if low and fmod(_flash_clock, 0.7) < 0.35 else Color.WHITE
 	_battery_label.text = ("LOW BATTERY  " if low and power_active else "") + ("Battery %.1f%% (%.1f / %.1f Wh)" % [pct, battery_charge_wh, battery_capacity_wh] if power_active else "Battery unavailable in orbit preview")
 	if not _skip_result.is_empty():
 		_battery_label.text = "Simulated minimum battery: %.1f%%" % battery_lowest_pct

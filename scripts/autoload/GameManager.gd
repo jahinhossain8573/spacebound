@@ -237,7 +237,7 @@ func _create_debug_panel() -> void:
 	panel.position = Vector2(20, 80)
 	panel.visible = false
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("17212f")
+	style.bg_color = Color("101214")
 	style.content_margin_left = 14
 	style.content_margin_right = 14
 	style.content_margin_top = 10

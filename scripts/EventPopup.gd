@@ -25,7 +25,7 @@ func setup(event: Dictionary, can_avoid: bool) -> void:
 	margin.add_child(_body)
 	var title := Label.new()
 	title.text = "%s  /  %s" % [event.severity.to_upper(), event.title]
-	title.add_theme_color_override("font_color", {"Minor":Color("ffb300"), "Major":Color("ff913d"), "Critical":Color("ff4d4d"), "Positive":Color("55d785")}[event.severity])
+	title.add_theme_color_override("font_color", {"Minor":Color("ff8811"), "Major":Color("ff8811"), "Critical":Color("ff8811"), "Positive":Color("279af1")}[event.severity])
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.add_child(title)
 	var description := Label.new()
