@@ -62,7 +62,9 @@ func run_tests() -> void:
 	launch._camera_input(drag)
 	var map_pan: Vector3 = launch._map_pan
 	var after_pan: Vector2 = launch._camera.unproject_position(earth_center)
-	check(after_pan.distance_to(before_pan + drag.relative) < 1.0, "middle-drag pans the launch map in screen space")
+	var map_view_size := Vector2(launch._launch_view.viewport.size)
+	var control_delta: Vector2 = (after_pan - before_pan) * launch._launch_view.size / map_view_size
+	check(control_delta.distance_to(drag.relative) < 1.0, "middle-drag pans the launch map in screen space")
 	key(launch, KEY_M)
 	check(not launch._map_view and launch._camera.global_transform.is_equal_approx(pad_transform), "M restores the flight camera")
 	launch._start.pressed.emit()

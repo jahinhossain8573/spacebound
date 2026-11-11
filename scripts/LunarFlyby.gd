@@ -13,7 +13,6 @@ var _hud: Control
 var _view: SubViewportContainer
 var _camera: Camera3D
 var _earth: EARTH
-var _environment: Environment
 var _trajectory: MeshInstance3D
 var _craft: MeshInstance3D
 var _parachute: Node3D
@@ -67,14 +66,15 @@ func _create_world() -> void:
 	light.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
 	world.add_child(light)
 	var environment := WorldEnvironment.new()
-	_environment = Environment.new()
-	_environment.background_mode = Environment.BG_COLOR
-	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_environment.ambient_light_color = Color("8c9ab1")
-	_environment.ambient_light_energy = 0.24
-	environment.environment = _environment
+	environment.environment = Environment.new()
+	environment.environment.background_mode = Environment.BG_COLOR
+	environment.environment.background_color = Color("050710")
+	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.environment.ambient_light_color = Color("8c9ab1")
+	environment.environment.ambient_light_energy = 0.24
 	world.add_child(environment)
 	_earth = EARTH.new()
+	_earth.sun = light
 	_earth.scale = Vector3.ONE * TRANSFER.EARTH_RADIUS_KM * SCALE
 	world.add_child(_earth)
 	var moon := _sphere(TRANSFER.MOON_RADIUS_KM * SCALE, Color("b7b7ba"), false)
@@ -356,7 +356,6 @@ func _update_camera() -> void:
 	_earth.update_horizon(_camera)
 	var ocean_detail := 1.0 - smoothstep(8.0, 22.0, altitude) if close_return else 0.0
 	_earth.set_ocean_detail(ocean_detail)
-	_environment.background_color = Color("050710").lerp(Color("76a9ce"), 1.0 - smoothstep(8.0, 80.0, altitude) if close_return else 0.0)
 	var marker_pixels := 26.0 if close_return else 12.0
 	var marker_size := marker_pixels * 2.0 * distance * tan(deg_to_rad(_camera.fov * 0.5)) / maxf(1.0, _view.size.y)
 	_craft.transform.basis = Basis(Quaternion(Vector3.UP, radial)).scaled(Vector3.ONE * marker_size)

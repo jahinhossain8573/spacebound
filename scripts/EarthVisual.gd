@@ -2,6 +2,7 @@ extends Node3D
 
 const MODEL := preload("res://assets/3d-models/earth/earth.glb")
 const GROUND_SHADER := preload("res://assets/3d-models/launch_area/kennedy_ground.gdshader")
+const ATMOSPHERE_SHADER := preload("res://assets/3d-models/earth/earth_atmosphere.gdshader")
 const GROUND_TEXTURE := preload("res://assets/3d-models/launch_area/kennedy_ground.png")
 const PAD_TEXTURE := preload("res://assets/3d-models/launch_area/kennedy_pad_detail.png")
 const FLORIDA_TEXTURE := preload("res://assets/3d-models/earth/florida_coast.jpg")
@@ -16,9 +17,13 @@ const KENNEDY_LONGITUDE := deg_to_rad(-80.6043)
 # The closest point on any triangle in the imported globe is at radius 0.999607.
 const OCCLUDER_RADIUS := 0.9996
 const OUTER_RADIUS := 1.0
+const EARTH_RADIUS_KM := 6371.0
 
+var sun: DirectionalLight3D
 var _globe: Node3D
 var _surface: ShaderMaterial
+var _atmosphere: MeshInstance3D
+var _atmosphere_material: ShaderMaterial
 var _patches: Array[MeshInstance3D] = []
 var _bounds: Array[AABB] = []
 
@@ -32,6 +37,19 @@ func _ready() -> void:
 		_patches.append(patch)
 		# The GLB patch vertices share the globe's origin and coordinate system.
 		_bounds.append(patch.get_aabb())
+	_atmosphere_material = ShaderMaterial.new()
+	_atmosphere_material.shader = ATMOSPHERE_SHADER
+	_atmosphere_material.render_priority = Material.RENDER_PRIORITY_MIN
+	_atmosphere_material.set_shader_parameter("earth_radius_km", EARTH_RADIUS_KM)
+	_atmosphere = MeshInstance3D.new()
+	_atmosphere.name = "EarthAtmosphere"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(2.0, 2.0)
+	_atmosphere.mesh = quad
+	_atmosphere.material_override = _atmosphere_material
+	_atmosphere.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_atmosphere.hide()
+	add_child(_atmosphere)
 
 static func make_surface(launch_plane: bool) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
@@ -117,3 +135,17 @@ func update_horizon(camera: Camera3D) -> void:
 		var bounds := _bounds[i]
 		var support := direction.dot(bounds.get_center()) + direction.abs().dot(bounds.size * 0.5)
 		_patches[i].visible = not can_cull or support >= cutoff
+	_update_atmosphere(camera)
+
+func _update_atmosphere(camera: Camera3D) -> void:
+	_atmosphere.visible = is_instance_valid(sun) and camera.projection == Camera3D.PROJECTION_PERSPECTIVE
+	if not _atmosphere.visible:
+		return
+	if _atmosphere.get_parent() != camera:
+		_atmosphere.reparent(camera, false)
+	_atmosphere.position.z = -camera.near * 2.0
+	var km_per_unit := EARTH_RADIUS_KM / global_basis.x.length()
+	var view_basis := camera.global_basis.inverse()
+	_atmosphere_material.set_shader_parameter("km_per_unit", km_per_unit)
+	_atmosphere_material.set_shader_parameter("observer_km", view_basis * ((camera.global_position - global_position) * km_per_unit))
+	_atmosphere_material.set_shader_parameter("sun_direction", view_basis * sun.global_basis.z.normalized())

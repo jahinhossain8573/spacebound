@@ -3,6 +3,7 @@ extends Control
 const UI = preload("res://scripts/UIStyle.gd")
 
 @export_enum("MainMenu", "MissionSelect", "Debrief") var screen := "MainMenu"
+@export var show_future_missions := false
 var _body: VBoxContainer
 var _details: VBoxContainer
 var _selected: Dictionary = {}
@@ -351,9 +352,9 @@ func _apply_row_visibility() -> void:
 			"active": show_row = unlocked and not completed
 			"archives": show_row = completed or number == 5
 			_: show_row = true
-		_mission_rows[number].wrap.visible = show_row
+		_mission_rows[number].wrap.visible = show_row and (show_future_missions or number != 7)
 	for row in _future_rows:
-		row.visible = _filter_mode == "available"
+		row.visible = show_future_missions and _filter_mode == "available"
 
 func _select_mission(mission: Dictionary) -> void:
 	if mission.is_empty(): return

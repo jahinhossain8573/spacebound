@@ -1,6 +1,7 @@
 extends Control
 
 const LAUNCH_BREAKUP := preload("res://scripts/LaunchBreakup.gd")
+const FULLSCREEN_3D_VIEW := preload("res://scripts/Fullscreen3DView.gd")
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
@@ -69,7 +70,7 @@ var _camera_yaw := 0.05
 var _camera_pitch := 0.34
 var _camera_distance := 2.25
 var _camera_dragging := false
-var _launch_view: SubViewportContainer
+var _launch_view: FULLSCREEN_3D_VIEW
 var _hud_overlay: Control
 var _env_data: Dictionary = {}
 var _pad_rig: Dictionary = {}
@@ -174,17 +175,13 @@ func _refresh_warp_buttons() -> void:
 		UI.style_button(btn, "green" if lvl == launch_warp else "slate", 7, 3, 3)
 
 func _create_ui() -> void:
-	var container := SubViewportContainer.new()
+	var container := FULLSCREEN_3D_VIEW.new()
 	_launch_view = container
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	container.focus_mode = Control.FOCUS_ALL
 	container.gui_input.connect(_camera_input)
-	container.stretch = true
 	add_child(container)
-	var viewport := SubViewport.new()
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	container.add_child(viewport)
+	var viewport := container.viewport
 	_root3d = Node3D.new()
 	viewport.add_child(_root3d)
 
@@ -301,6 +298,7 @@ func _create_world() -> void:
 
 	_earth = EARTH_VISUAL.new()
 	_earth.name = "Earth"
+	_earth.sun = light
 	_earth.basis = EARTH_VISUAL.kennedy_basis().scaled(Vector3.ONE * EARTH_RADIUS_M)
 	_earth_spin.add_child(_earth)
 
@@ -989,7 +987,7 @@ func _camera_input(event: InputEvent) -> void:
 				_camera_distance = clampf(_camera_distance * factor, 0.35, 8.0)
 	elif event is InputEventMouseMotion:
 		if _map_view and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
-			_map_pan += _camera.project_position(-event.relative, _map_distance) - _camera.project_position(Vector2.ZERO, _map_distance)
+			_map_pan += _camera.project_position(-_launch_view.to_viewport_delta(event.relative), _map_distance) - _camera.project_position(Vector2.ZERO, _map_distance)
 		elif _camera_dragging and _map_view:
 			_map_yaw -= event.relative.x * 0.01
 			_map_pitch = clampf(_map_pitch + event.relative.y * 0.01, -1.4, 1.4)

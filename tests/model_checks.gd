@@ -5,7 +5,11 @@ extends RefCounted
 const LIBRARY_MATERIALS := ["sb_white_paint", "sb_black_composite", "sb_mli_gold", "sb_mli_silver", "sb_solar_cell", "sb_aluminium", "sb_nozzle", "sb_black_anodised", "sb_glass_lens"]
 const TRIANGLES := {"parts": Vector2i(200, 4000), "buses": Vector2i(1000, 6000), "launchers": Vector2i(8000, 25000), "environment": Vector2i(0, 15000), "vehicles": Vector2i(0, 12000)}
 const MAX_TEXTURE := {"parts": 512, "buses": 1024, "launchers": 2048, "environment": 2048, "vehicles": 1024}
-const TEXTURE_LIMIT_OVERRIDES := {"launcher_vega_c": 4096}
+const TEXTURE_LIMIT_OVERRIDES := {
+	"launcher_electron": 4096,
+	"launcher_falcon_9": 4096,
+	"launcher_vega_c": 4096,
+}
 const BUS_EMPTIES := {"mount_top": Vector3.UP, "mount_bottom": Vector3.DOWN, "mount_front": Vector3.FORWARD, "mount_back": Vector3.BACK, "mount_left": Vector3.LEFT, "mount_right": Vector3.RIGHT, "array_hinge_left": Vector3.LEFT, "array_hinge_right": Vector3.RIGHT, "engine_mount": Vector3.DOWN}
 const ROCKET_NODES := ["stage_1", "payload_mount", "exhaust_stage_1", "fairing_left", "fairing_right"]
 const SIZE_TOLERANCE := 0.1

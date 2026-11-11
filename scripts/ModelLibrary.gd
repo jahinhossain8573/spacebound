@@ -5,6 +5,8 @@ const CATEGORIES := ["launchers", "buses", "parts", "environment", "vehicles"]
 static func path_for(category: String, id: String) -> String:
 	if category == "launchers" and id == "launcher_vega_c":
 		return "res://assets/3d-models/rockets/vega-c/launcher_vega_c.glb"
+	if category == "launchers" and id == "launcher_falcon_9":
+		return "res://assets/3d-models/rockets/falcon9/launcher_falcon_9.glb"
 	return "res://assets/models/%s/%s.glb" % [category, id]
 
 static func has_model(category: String, id: String) -> bool:
@@ -15,7 +17,16 @@ static func instantiate(category: String, id: String) -> Node3D:
 	if not has_model(category, id):
 		return null
 	var scene := load(path_for(category, id)) as PackedScene
-	return scene.instantiate() as Node3D if scene else null
+	if scene == null:
+		return null
+	var model := scene.instantiate() as Node3D
+	if model and category == "launchers":
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			for surface in mesh.mesh.get_surface_count():
+				var material := mesh.get_active_material(surface) as BaseMaterial3D
+				if material:
+					material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return model
 
 ## Metallic materials look black with nothing to reflect; a sky lights reflections while the
 ## background stays a flat colour.

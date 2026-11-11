@@ -2,6 +2,7 @@ extends Control
 
 signal build_changed
 
+const FULLSCREEN_3D_VIEW := preload("res://scripts/Fullscreen3DView.gd")
 const UI = preload("res://scripts/UIStyle.gd")
 const WAREHOUSE = preload("res://scripts/WarehouseWorld.gd")
 const CATEGORIES := ["power", "avionics", "adcs", "comms", "propulsion", "instrument", "thermal", "landing"]
@@ -19,7 +20,7 @@ var _slider: HSlider
 var _spin: SpinBox
 var _fuel_hint: Label
 var _message: Label
-var _viewport_container: SubViewportContainer
+var _viewport_container: FULLSCREEN_3D_VIEW
 var _craft: Node3D
 var _attachments: Node3D
 var _camera: Camera3D
@@ -67,17 +68,11 @@ func _ready() -> void:
 
 func _make_ui() -> void:
 	# 1. Full-screen 3D Warehouse Viewport behind all VAB chrome
-	_viewport_container = SubViewportContainer.new()
+	_viewport_container = FULLSCREEN_3D_VIEW.new()
 	_viewport_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_viewport_container.stretch = true
 	_viewport_container.focus_mode = Control.FOCUS_ALL
 	_viewport_container.gui_input.connect(_viewport_input)
 	add_child(_viewport_container)
-	var viewport := SubViewport.new()
-	viewport.name = "SpacecraftViewport"
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_viewport_container.add_child(viewport)
 
 	# 2. Top KSP VAB Metallic Header Bar
 	var top_bar := PanelContainer.new()
@@ -470,7 +465,7 @@ func _set_category_filter(cat_id: String) -> void:
 	_refresh_parts()
 
 func _make_world() -> void:
-	var viewport: SubViewport = _viewport_container.get_child(0)
+	var viewport := _viewport_container.viewport
 	var world := Node3D.new()
 	viewport.add_child(world)
 	var env := WorldEnvironment.new()

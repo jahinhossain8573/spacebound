@@ -1,5 +1,6 @@
 extends Control
 
+const FULLSCREEN_3D_VIEW := preload("res://scripts/Fullscreen3DView.gd")
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const UI = preload("res://scripts/UIStyle.gd")
@@ -21,7 +22,7 @@ var _marker: ORBIT_MAP_MARKER
 var _map_direction := Vector3.ZERO
 var _camera: Camera3D
 var _earth: EARTH_VISUAL
-var _view: SubViewportContainer
+var _view: FULLSCREEN_3D_VIEW
 var _flight_hud: Control
 var _warp_buttons: Dictionary = {}
 var _hud: Label
@@ -122,16 +123,12 @@ func _ready() -> void:
 		tween.tween_callback(fade.queue_free)
 
 func _build_scene() -> void:
-	_view = SubViewportContainer.new()
+	_view = FULLSCREEN_3D_VIEW.new()
 	_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_view.stretch = true
 	_view.focus_mode = Control.FOCUS_ALL
 	_view.gui_input.connect(_view_input)
 	add_child(_view)
-	var viewport := SubViewport.new()
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.add_child(viewport)
+	var viewport := _view.viewport
 	var world := Node3D.new()
 	viewport.add_child(world)
 	var environment := WorldEnvironment.new()
@@ -153,6 +150,8 @@ func _build_scene() -> void:
 	var sun := DirectionalLight3D.new()
 	world.add_child(sun)
 	sun.look_at(Vector3.LEFT, Vector3.UP)
+	if is_instance_valid(_earth):
+		_earth.sun = sun
 	_plotter = preload("res://scripts/OrbitPlotter.gd").new()
 	world.add_child(_plotter)
 	_plotter.visible = false
@@ -463,7 +462,7 @@ func _view_input(event: InputEvent) -> void:
 			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 1.5 if shared_launch != null else 0.06, 100000000.0 if shared_launch != null else 5000.0)
 	elif event is InputEventMouseMotion:
 		if _map_view and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
-			_map_pan += _camera.project_position(-event.relative, _distance) - _camera.project_position(Vector2.ZERO, _distance)
+			_map_pan += _camera.project_position(-_view.to_viewport_delta(event.relative), _distance) - _camera.project_position(Vector2.ZERO, _distance)
 			_update_camera()
 			_update_map_readout()
 		elif _dragging:
@@ -581,7 +580,7 @@ func _open_debrief() -> void:
 	if not DisplayServer.get_name() == "headless":
 		get_tree().call_deferred("change_scene_to_file", "res://scenes/Debrief.tscn")
 
-func activate_shared_world(view: SubViewportContainer, world: Node3D, rocket: Node3D, camera: Camera3D, camera_transform: Transform3D, yaw: float, pitch: float, distance: float) -> void:
+func activate_shared_world(view: FULLSCREEN_3D_VIEW, world: Node3D, rocket: Node3D, camera: Camera3D, camera_transform: Transform3D, yaw: float, pitch: float, distance: float) -> void:
 	var old_view := _view
 	var parent := old_view.get_parent()
 	var index := old_view.get_index()

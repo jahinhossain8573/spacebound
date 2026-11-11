@@ -1,6 +1,6 @@
 extends Node3D
 
-const FALCON_9 := preload("res://assets/3d-models/rockets/falcon9/launcher_falcon_9.glb")
+const MODEL_LIBRARY := preload("res://scripts/ModelLibrary.gd")
 const SPACE_CENTER := preload("res://scripts/SpaceCenterWorld.gd")
 const STEAM := preload("res://assets/vfx/kenney/smoke_08.png")
 const MIST := preload("res://assets/vfx/kenney/smoke_07.png")
@@ -20,7 +20,7 @@ func _ready() -> void:
 	var ground := SPACE_CENTER.add_scenery(station)
 	var ground_material := ground.material_override as ShaderMaterial
 	ground_material.set_shader_parameter("local_detail", 1.0)
-	var rocket := FALCON_9.instantiate() as Node3D
+	var rocket := MODEL_LIBRARY.instantiate("launchers", "launcher_falcon_9")
 	rocket.rotation_degrees.y = -40.0
 	add_child(rocket)
 	for mesh: MeshInstance3D in rocket.find_children("*", "MeshInstance3D", true, false):

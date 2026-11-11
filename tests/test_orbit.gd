@@ -45,7 +45,9 @@ func run_tests() -> void:
 	var center: Vector2 = flight._camera.unproject_position(Vector3.ZERO)
 	flight._view_input(drag)
 	var after_pan: Vector2 = flight._camera.unproject_position(Vector3.ZERO)
-	check(after_pan.distance_to(center + drag.relative) < 1.0, "middle-drag pans the orbital map in screen space")
+	var map_view_size := Vector2(flight._view.viewport.size)
+	var control_delta: Vector2 = (after_pan - center) * flight._view.size / map_view_size
+	check(control_delta.distance_to(drag.relative) < 1.0, "middle-drag pans the orbital map in screen space")
 	flight.toggle_map_view()
 	check(not flight._map_view and is_equal_approx(flight._yaw, 1.1) and is_equal_approx(flight._distance, 0.25), "flight camera restored")
 	flight._view_input(drag)

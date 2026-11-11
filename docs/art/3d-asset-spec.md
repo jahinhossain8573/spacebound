@@ -51,7 +51,7 @@ An asset may use a material outside the library when nothing in it fits, such as
   | Buses, vehicles | 1024 px |
   | Rockets, environment | 2048 px |
 
-  Vega-C's full-length livery uses a 4096 × 4096 px texture to keep the markings legible in close-up.
+  Electron, Falcon 9, and Vega-C use full-length livery textures up to 4096 px to keep their markings legible in close-up.
 
 - **Triangle budgets:** the upper limits are enforced. The lower numbers are guidance; a simple part may be smaller.
 
@@ -121,6 +121,8 @@ blender -b art_source/<category>/<id>.blend --python art_source/tools/sb_export.
 ```
 
 The script refuses to export when units, scale, materials, triangle count or object names break the rules above. Otherwise it writes `assets/models/<category>/<id>.glb` with the correct glTF settings: GLB, +Y up, modifiers applied, textures embedded, animations exported per action.
+
+To reapply the Electron or Falcon 9 livery after a geometry export, run `python3 art_source/tools/paint_launcher.py electron clean.glb painted.glb` (use `falcon9` for Falcon 9). This requires Pillow and embeds the livery in the output GLB.
 
 ## Checking a model
 

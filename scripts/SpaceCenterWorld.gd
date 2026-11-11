@@ -19,7 +19,6 @@ const SKY_ZENITH_DAY := Color("5079a6")
 const SKY_HORIZON_DAY := Color("cbd6db")
 const GROUND_HORIZON_DAY := Color("8d9c7e")
 const GROUND_BOTTOM_DAY := Color("3e5729")
-const SPACE_COLOR := Color("05070d")
 
 static func mat(albedo: Color, roughness := 0.85, metallic := 0.0, unshaded := false) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -42,26 +41,19 @@ static func create_environment() -> Dictionary:
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	environment.sky = sky
-	environment.background_mode = Environment.BG_SKY
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color("05070d")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("b7c6d6")
 	environment.ambient_light_energy = 0.72
 	environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	return {"environment": environment, "sky_material": sky_mat}
+	return {"environment": environment}
 
 static func update_atmosphere(env_data: Dictionary, altitude_m: float) -> void:
-	if env_data.is_empty():
-		return
 	var env: Environment = env_data.get("environment")
-	var sky_mat: ProceduralSkyMaterial = env_data.get("sky_material")
-	if env == null or sky_mat == null:
+	if env == null:
 		return
-	var t := clampf(altitude_m / 65000.0, 0.0, 1.0)
-	var curved := pow(t, 0.65)
-	sky_mat.sky_top_color = SKY_ZENITH_DAY.lerp(SPACE_COLOR, curved)
-	sky_mat.sky_horizon_color = SKY_HORIZON_DAY.lerp(Color("16294a"), clampf(t * 1.8, 0.0, 1.0)).lerp(SPACE_COLOR, clampf((t - 0.45) / 0.55, 0.0, 1.0))
-	sky_mat.ground_horizon_color = GROUND_HORIZON_DAY.lerp(SPACE_COLOR, curved)
-	sky_mat.ground_bottom_color = GROUND_BOTTOM_DAY.lerp(SPACE_COLOR, curved)
+	var curved := pow(clampf(altitude_m / 65000.0, 0.0, 1.0), 0.65)
 	env.ambient_light_color = Color("b7c6d6").lerp(Color("455878"), curved)
 	env.ambient_light_energy = lerpf(0.72, 0.42, curved)
 
