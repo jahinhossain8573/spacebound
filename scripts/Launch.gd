@@ -4,6 +4,7 @@ const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
 const ASCENT = preload("res://scripts/AscentSim.gd")
+const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
 const SPACE_CENTER = preload("res://scripts/SpaceCenterWorld.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const UI = preload("res://scripts/UIStyle.gd")
@@ -69,6 +70,7 @@ var _env_data: Dictionary = {}
 var _pad_rig: Dictionary = {}
 var _station: Node3D
 var _earth_spin: Node3D
+var _earth: EARTH_VISUAL
 var _flight: Control
 var _trajectory: Dictionary
 var _segments: Array[Dictionary] = []
@@ -280,19 +282,10 @@ func _create_world() -> void:
 	_earth_spin.position = Vector3(0.0, -EARTH_RADIUS_M, 0.0)
 	_anchor.add_child(_earth_spin)
 
-	var planet := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = EARTH_RADIUS_M
-	sphere.height = EARTH_RADIUS_M * 2.0
-	sphere.radial_segments = 96
-	sphere.rings = 48
-	planet.mesh = sphere
-	planet.position = Vector3(0.0, -4.0, 0.0)
-	var ocean_mat := StandardMaterial3D.new()
-	ocean_mat.albedo_color = Color("1e579e")
-	ocean_mat.roughness = 0.55
-	planet.material_override = ocean_mat
-	_earth_spin.add_child(planet)
+	_earth = EARTH_VISUAL.new()
+	_earth.name = "Earth"
+	_earth.basis = EARTH_VISUAL.kennedy_basis().scaled(Vector3.ONE * EARTH_RADIUS_M)
+	_earth_spin.add_child(_earth)
 
 	_station = Node3D.new()
 	_station.name = "LaunchStation"
@@ -300,7 +293,7 @@ func _create_world() -> void:
 
 	var build: Dictionary = GameManager.current_build
 	var diameter: float = float(build.launcher.ascent.get("diameterMeters", 1.2))
-	_pad_rig = SPACE_CENTER.populate_space_center(_station, _earth_spin, rocket_height, diameter * 0.5)
+	_pad_rig = SPACE_CENTER.populate_space_center(_station, rocket_height, diameter * 0.5)
 
 	_rocket = Node3D.new()
 	_root3d.add_child(_rocket)
@@ -469,8 +462,6 @@ func _begin_ascent() -> void:
 		for definition in m.objectives:
 			GameManager.last_result.objectives.append({"id":definition.id, "name":definition.name, "done":false})
 	_log("Main engine ignition aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100], 0.0)
-	if _pad_rig.has("umbilical_arm") and is_instance_valid(_pad_rig.umbilical_arm):
-		create_tween().tween_property(_pad_rig.umbilical_arm, "rotation:y", deg_to_rad(72.0), 0.9)
 	_refresh_stage_hud(1.0, 1.0)
 	_refresh_warp_buttons()
 	_apply_sample(ASCENT.sample_at(_trajectory.samples, 0.0))
@@ -570,7 +561,6 @@ func _apply_sample(sample: Dictionary) -> void:
 	_rocket.rotation.z = atan2(-axis_x, axis_y)
 
 	var alt_m: float = maxf(0.0, r_len - EARTH_RADIUS_M)
-	_station.visible = alt_m < 5000.0
 	SPACE_CENTER.update_atmosphere(_env_data, alt_m)
 
 	var s1_firing := _firing("liftoff", "meco")
@@ -757,7 +747,6 @@ func _finish_success() -> void:
 	GameManager.initial_orbit = initial
 	var start_radius: float = initial.semi_major_axis_km * (1.0 - initial.eccentricity) * 1000.0
 	place_craft(start_radius * sin(initial.arg_periapsis_rad), start_radius * cos(initial.arg_periapsis_rad))
-	_station.visible = false
 	SPACE_CENTER.update_atmosphere(_env_data, 100000.0)
 	if _upper_flame: _upper_flame.visible = false
 	_clear_debris()
@@ -826,6 +815,14 @@ func _update_camera() -> void:
 	var target := focus_point()
 	_camera.position = target + camera_offset(rocket_height * _camera_distance, _camera_yaw, _camera_pitch)
 	_camera.look_at(target, local_frame().y)
+
+	update_world_visibility()
+
+func update_world_visibility() -> void:
+	var pad_distance := _camera.global_position.distance_to(_station.global_position)
+	_station.visible = pad_distance < SPACE_CENTER.STATION_RANGE_M
+	_pad_rig.root.visible = pad_distance < SPACE_CENTER.PAD_DETAIL_RANGE_M
+	_earth.update_horizon(_camera)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):

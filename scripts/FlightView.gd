@@ -3,6 +3,7 @@ extends Control
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const UI = preload("res://scripts/UIStyle.gd")
+const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
@@ -17,6 +18,7 @@ var in_eclipse := false
 var _plotter
 var _marker: MeshInstance3D
 var _camera: Camera3D
+var _earth: EARTH_VISUAL
 var _view: SubViewportContainer
 var _flight_hud: Control
 var _warp_buttons: Dictionary = {}
@@ -137,17 +139,13 @@ func _build_scene() -> void:
 	environment.environment.ambient_light_energy = 0.62
 	MODEL_LIBRARY.use_sky_reflections(environment.environment)
 	world.add_child(environment)
-	var earth := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 50.0
-	sphere.height = 100.0
-	sphere.rings = 32
-	earth.mesh = sphere
-	var blue := StandardMaterial3D.new()
-	blue.albedo_color = Color("1f5ca8")
-	blue.roughness = 0.72
-	earth.material_override = blue
-	world.add_child(earth)
+	if not is_instance_valid(shared_launch):
+		_earth = EARTH_VISUAL.new()
+		_earth.name = "Earth"
+		var flight_frame := Basis(Vector3.BACK, Vector3.RIGHT, Vector3.UP)
+		_earth.basis = (flight_frame * EARTH_VISUAL.kennedy_basis()).scaled(Vector3.ONE * FlightSim.R_EARTH_KM * FlightSim.RENDER_SCALE)
+		world.add_child(_earth)
+
 	var sun := DirectionalLight3D.new()
 	world.add_child(sun)
 	sun.look_at(Vector3.LEFT, Vector3.UP)
@@ -387,9 +385,14 @@ func _update_camera() -> void:
 		if _camera_mode == "Spacecraft":
 			_camera.position = target + shared_launch.camera_offset(_distance, _yaw, _pitch)
 			_camera.look_at(target, shared_launch.local_frame().y)
+			shared_launch.update_world_visibility()
 			return
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
+	if is_instance_valid(shared_launch):
+		shared_launch.update_world_visibility()
+	elif is_instance_valid(_earth):
+		_earth.update_horizon(_camera)
 
 func _reset_view() -> void:
 	_yaw = 0.55
@@ -536,6 +539,7 @@ func activate_shared_world(view: SubViewportContainer, world: Node3D, rocket: No
 	_plotter.transform = Transform3D(Basis(Vector3.UP, Vector3.BACK, Vector3.RIGHT).scaled(Vector3.ONE * SHARED_SCALE), _shared_center)
 	_update_position()
 	_camera.global_transform = camera_transform
+	shared_launch.update_world_visibility()
 
 func _eclipse_fraction() -> float:
 	return 72.0 / 1436.0 if mission.get("targetOrbit", "") in ["GEO", "GTO"] else FlightSim.eclipse_fraction(orbit.semi_major_axis_km)

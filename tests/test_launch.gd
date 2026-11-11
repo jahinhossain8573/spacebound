@@ -17,6 +17,17 @@ func run_tests() -> void:
 	var launch = scene.instantiate()
 	root.add_child(launch)
 	launch.set_process(false)
+	var launch_origin := launch._station.find_child("launch_origin", true, false) as Node3D
+	check(launch_origin != null and launch_origin.global_position.is_equal_approx(launch._rocket.global_position), "rocket starts on the LC-39A launch marker")
+	var patches: Array[MeshInstance3D] = launch._earth._patches
+	check(patches.size() == 20 and patches.any(func(patch: MeshInstance3D) -> bool: return not patch.visible), "pad camera culls far-side Earth patches")
+	var pad_camera: Transform3D = launch._camera.global_transform
+	launch._camera.position = Vector3(0.0, 20000.0, 0.0)
+	launch.update_world_visibility()
+	check(not launch._station.visible, "camera distance hides Kennedy scenery")
+	launch._camera.global_transform = pad_camera
+	launch.update_world_visibility()
+	check(launch._station.visible, "Kennedy scenery returns when the camera moves closer")
 	check(launch._payload != null and launch._payload.get_parent().name == "payload_mount", "spacecraft rides on the Electron payload mount")
 	check(launch._payload.get_node("mount_front").global_position.y > launch._payload.global_position.y + 0.1, "spacecraft front end faces away from the adapter")
 	check(launch._stage.get_node_or_null("stage_1") != null and launch._stage.get_node_or_null("interstage") != null and launch._fairing_left.name == "fairing_left", "model sections drive staging")
@@ -67,7 +78,7 @@ func run_tests() -> void:
 	check(antenna.is_playing() and antenna.current_animation == "deploy", "antenna deploys after separation")
 	check(is_instance_valid(shared._marker) and is_instance_valid(shared._camera), "shared world survives view replacement")
 	shared.toggle_map_view()
-	check(shared._map_view, "shared-world map view available")
+	check(shared._map_view and patches.any(func(patch: MeshInstance3D) -> bool: return patch.visible) and patches.any(func(patch: MeshInstance3D) -> bool: return not patch.visible), "shared-world map keeps near Earth patches and culls the far side")
 	shared.toggle_map_view()
 	check(not shared._map_view, "shared-world third person restored")
 	launch.queue_free()
