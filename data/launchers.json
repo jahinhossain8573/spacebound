@@ -38,12 +38,12 @@
     "ascent": {
       "diameterMeters": 3.4,
       "fairingMassKg": 860,
-      "pitchKickDeg": 3.0,
+      "pitchKickDeg": 17.0,
       "stagingCoastSeconds": 5,
       "siteRotationMps": 409,
       "stages": [
         {"thrustSeaLevelN": 4100000, "thrustVacuumN": 4500000, "ispVacuumS": 279, "propellantKg": 142000, "dryMassKg": 11000},
-        {"thrustVacuumN": 650000, "ispVacuumS": 295, "propellantKg": 47000, "dryMassKg": 6500}
+        {"thrustVacuumN": 650000, "ispVacuumS": 320, "propellantKg": 47000, "dryMassKg": 6500}
       ]
     }
   },

@@ -109,7 +109,7 @@ func _valid_record(item: Dictionary, kind: String) -> bool:
 					if not objective is Dictionary: return false
 					for key in ["id", "name", "trigger"]:
 						if not objective.get(key) is String or objective[key].is_empty(): return false
-					if objective.id in objective_ids or objective.trigger not in ["launch", "sunlit_pass", "duration", "imaging", "downlink", "clear_days", "circularize", "powered_part"]: return false
+					if objective.id in objective_ids or objective.trigger not in ["launch", "sunlit_pass", "duration", "imaging", "downlink", "clear_days", "circularize", "powered_part", "trans_lunar", "lunar_corridor", "deep_space_link", "splashdown"]: return false
 					objective_ids[objective.id] = true
 					if objective.trigger == "imaging" and (not _is_number(objective.get("targetImages")) or objective.targetImages < 1 or objective.targetImages != floor(objective.targetImages)): return false
 					if objective.trigger == "clear_days" and (not _is_number(objective.get("minimumClearDays")) or objective.minimumClearDays <= 0): return false

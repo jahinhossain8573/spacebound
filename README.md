@@ -161,3 +161,12 @@ Run the dedicated checks with `godot --headless --path . --script res://tests/te
 The reference build uses Falcon 9, the heavy bus, Airbus array, EaglePicher battery, RAD750, R-4D-15 and Ku/Ka transponders, with 400 kg of propellant. Wait for apoapsis and burn prograde about 1,470 m/s; Skip becomes available once GEO is reached. An underperforming burn can be corrected with a second burn. The orbit model is planar and burns are instantaneous.
 
 Run `godot --headless --path . --script res://tests/test_mission4.gd` and `godot --headless --path . --script res://tests/test_day2_campaign.gd`. The fresh-campaign reference path has 96 SP before spending 82 SP on Mission 4 research. The full suite and a release Web export pass; a local browser preview verified the launch, apoapsis wait and GEO burn. Public deployment remains deferred.
+
+
+## Mission 5 — Cislunar Pathfinder
+
+Complete Mission 4 to unlock the Vega-C campaign launch. For a practice run, open **Archives → Cislunar Pathfinder → Start test flight**. The prebuilt spacecraft starts on the Earth launch pad. The test flight leaves campaign progress and rewards untouched.
+
+After 90 seconds in a 250 km parking orbit, the upper stage automatically injects toward the Moon. At the navigation update, a 47 m/s prograde correction predicts a 440 km flyby. Resume cruise to capture the lunar images, then follow the guided reentry and parachute descent to splashdown in the Pacific. A successful campaign run opens Tier 4 and unlocks Mission 7.
+
+Run `godot --headless --path . --script res://tests/test_lunar_flyby.gd` to check the campaign and Archives paths, trajectory correction, missed and impact cases, and deep-space power.

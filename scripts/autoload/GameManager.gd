@@ -20,6 +20,7 @@ var last_result: Dictionary = {}
 var last_receipt: Dictionary = {}
 var attempt_id: String = ""
 var attempt_is_replay: bool = false
+var attempt_is_archive := false
 var save_path := "user://save.json"
 var has_launched_once := false
 var flight_elapsed_s := 0.0
@@ -46,6 +47,7 @@ func new_campaign() -> Error:
 	last_receipt = {}
 	attempt_id = ""
 	attempt_is_replay = false
+	attempt_is_archive = false
 	debug_disable_reliability = false
 	debug_force_launch_failure = false
 	has_launched_once = false
@@ -117,6 +119,7 @@ func load_campaign() -> Error:
 	last_result = {}
 	attempt_id = ""
 	attempt_is_replay = false
+	attempt_is_archive = false
 	campaign_changed.emit()
 	return OK
 
@@ -133,15 +136,42 @@ func is_mission_unlocked(number: int) -> bool:
 func start_mission(number: int) -> bool:
 	if not is_mission_unlocked(number):
 		return false
+	_begin_attempt(number)
+	return true
+
+func start_lunar_archive() -> bool:
+	var mission := GlobalData.get_mission(5)
+	if mission.is_empty():
+		return false
+	var parts: Array[Dictionary] = []
+	for id in ["com_gd_sdst", "inst_lroc_wac", "av_bae_rad750", "prop_mr103g", "pwr_mma_ehawk_s", "pwr_mma_ehawk_s", "pwr_mma_ehawk_s", "pwr_gomspace_bp4"]:
+		parts.append(GlobalData.get_part(id))
+	var build := {
+		"launcher": GlobalData.get_launcher(mission.requiredLauncher),
+		"bus": GlobalData.get_bus(mission.requiredBus),
+		"installed_components": parts,
+		"propellant_mass_kg": 0.85
+	}
+	var helper = load("res://scripts/BuildStats.gd").new()
+	for check: Dictionary in helper.run_readiness_review(build, mission):
+		if check.status == "FAIL":
+			return false
+	build.stats = helper.calculate_stats(build, mission)
+	_begin_attempt(5)
+	attempt_is_archive = true
+	current_build = build
+	return true
+
+func _begin_attempt(number: int) -> void:
 	flight_elapsed_s = 0.0
 	current_mission = GlobalData.get_mission(number)
 	current_build = {}
 	initial_orbit = null
 	attempt_id = Crypto.new().generate_random_bytes(16).hex_encode()
 	attempt_is_replay = number in completed_missions
+	attempt_is_archive = false
 	last_result = {}
 	state = State.WORKSHOP
-	return true
 
 func compute_score(result: Dictionary) -> Dictionary:
 	var mission := GlobalData.get_mission(int(result.get("mission_number", 0)))
@@ -207,6 +237,10 @@ func finalize_mission(result: Dictionary) -> Dictionary:
 	if result.has("images_captured"): receipt["images_captured"] = result.images_captured
 	if result.has("clear_observation_s"): receipt["clear_observation_s"] = result.clear_observation_s
 	receipt["unlocks"] = []
+	if attempt_is_archive:
+		receipt["science_points"] = 0
+		receipt["funds_millions"] = 0.0
+		return receipt
 	funds_millions += receipt.funds_millions
 	science_points += receipt.science_points
 	var number := int(current_mission.missionNumber)

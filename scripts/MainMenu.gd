@@ -53,7 +53,10 @@ func _menu_button(caption: String, action: Callable, available: bool = true) -> 
 	button.text = caption.to_upper()
 	button.disabled = not available
 	button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	button.pressed.connect(action)
+	button.pressed.connect(func():
+		button.release_focus()
+		action.call()
+	)
 	_body.add_child(button)
 	return button
 

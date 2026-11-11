@@ -120,7 +120,7 @@ func _ready() -> void:
 			set_process(false)
 			return
 	build.stats = validator.calculate_stats(build, mission)
-	if mission.get("targetOrbit", "") not in ["LEO", "SSO", "GEO", "GTO"]:
+	if mission.get("targetOrbit", "") not in ["LEO", "SSO", "GEO", "GTO", "Lunar Flyby"]:
 		_status.text = "This mission requires its dedicated lunar flight destination."
 		_start.disabled = true
 		_hud_overlay.sync_banners()
@@ -130,7 +130,12 @@ func _ready() -> void:
 	rocket_height = {"launcher_electron":18.0, "launcher_vega_c":35.0, "launcher_falcon_9":70.0}.get(build.launcher.id, 18.0)
 	focus_height = rocket_height * 0.44
 	_upper_focus = rocket_height * 0.75
-	_ascent = LIVE_ASCENT.new(build.launcher.ascent, float(build.stats.wet_mass_kg), mission)
+	var ascent_mission := mission
+	if mission.targetOrbit == "Lunar Flyby":
+		ascent_mission = mission.duplicate()
+		ascent_mission.targetOrbit = "LEO"
+		ascent_mission.targetAltitudeKm = 250.0
+	_ascent = LIVE_ASCENT.new(build.launcher.ascent, float(build.stats.wet_mass_kg), ascent_mission)
 	_ground_speed = _ascent.ground_speed
 	_guidance_enabled = FLIGHT_PREFERENCES.guidance_enabled()
 	_hud_overlay.guidance_panel.visible = _guidance_enabled
@@ -310,7 +315,7 @@ func _create_world() -> void:
 	if model:
 		_assemble_model_rocket(model, build)
 	else:
-		_assemble_primitive_rocket()
+		_assemble_primitive_rocket(build)
 	_flash = MeshInstance3D.new()
 	var flash_mesh := SphereMesh.new()
 	flash_mesh.radius = rocket_height * 0.045
@@ -361,6 +366,9 @@ func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
 	if upper:
 		_upper_flame = _add_flame(upper.get_parent() as Node3D, upper, true)
 	var mount := model.find_child("payload_mount", true, false) as Node3D
+	_mount_payload(mount, build)
+
+func _mount_payload(mount: Node3D, build: Dictionary) -> void:
 	_payload = SPACECRAFT.build(build.bus, build.installed_components)
 	if mount and _payload:
 		_payload.name = "Payload"
@@ -380,15 +388,17 @@ func _add_flame(parent: Node3D, exhaust: Node3D, upper_stage: bool) -> LAUNCH_PL
 	parent.add_child(plume)
 	return plume
 
-func _assemble_primitive_rocket() -> void:
+func _assemble_primitive_rocket(build: Dictionary) -> void:
 	var radius := rocket_height * 0.045
 	_stage = Node3D.new()
 	_rocket.add_child(_stage)
 	_cylinder(_stage, radius, rocket_height*0.5, rocket_height*0.25, Color("d5dce3"))
 	_cylinder(_stage, radius*1.02, rocket_height*0.025, rocket_height*0.48, Color("1a2029"))
 	_cylinder(_stage, radius*0.65, rocket_height*0.07, -rocket_height*0.025, Color("59636e"))
-	_cylinder(_rocket, radius*0.85, rocket_height*0.3, rocket_height*0.65, Color("d5dce3"))
-	_cylinder(_rocket, radius*0.88, rocket_height*0.025, rocket_height*0.55, Color("1a2029"))
+	_model = Node3D.new()
+	_rocket.add_child(_model)
+	_cylinder(_model, radius*0.85, rocket_height*0.3, rocket_height*0.65, Color("d5dce3"))
+	_cylinder(_model, radius*0.88, rocket_height*0.025, rocket_height*0.55, Color("1a2029"))
 	_fairing_left = Node3D.new()
 	_fairing_right = Node3D.new()
 	_rocket.add_child(_fairing_left)
@@ -405,8 +415,12 @@ func _assemble_primitive_rocket() -> void:
 	_stage1_flame.name = "Flame"
 	var upper_exhaust := Node3D.new()
 	upper_exhaust.position.y = rocket_height * 0.5
-	_rocket.add_child(upper_exhaust)
-	_upper_flame = _add_flame(_rocket, upper_exhaust, true)
+	_model.add_child(upper_exhaust)
+	_upper_flame = _add_flame(_model, upper_exhaust, true)
+	var mount := Node3D.new()
+	mount.position.y = rocket_height * 0.8
+	_model.add_child(mount)
+	_mount_payload(mount, build)
 
 func calculate_reliability(base: float, nodes: Array) -> float:
 	var result := base
@@ -418,7 +432,7 @@ func ignite() -> void:
 	if ignited or finished or _start.disabled: return
 	reliability = calculate_reliability(float(GameManager.current_build.launcher.baseReliability), GameManager.owned_tech_nodes)
 	var roll := rng.randf()
-	failed = roll > reliability
+	failed = not GameManager.attempt_is_archive and roll > reliability
 	if OS.is_debug_build():
 		if GameManager.debug_disable_reliability: failed = false
 		if GameManager.debug_force_launch_failure: failed = true
@@ -426,13 +440,14 @@ func ignite() -> void:
 	for stage: Dictionary in _ascent.stages:
 		powered_cutoff += float(stage.propellantKg) / ASCENT.propellant_flow(stage)
 	failure_at = rng.randf_range(6.0, maxf(12.0, powered_cutoff * 0.92)) if failed else 0.0
-	GameManager.has_launched_once = true
-	if GameManager.save_campaign() != OK:
-		_warning.text = "Could not save launch history. Retry before launch."
-		_save_retry.visible = true
-		_start.disabled = true
-		_hud_overlay.sync_banners()
-		return
+	if not GameManager.attempt_is_archive:
+		GameManager.has_launched_once = true
+		if GameManager.save_campaign() != OK:
+			_warning.text = "Could not save launch history. Retry before launch."
+			_save_retry.visible = true
+			_start.disabled = true
+			_hud_overlay.sync_banners()
+			return
 	_begin_ascent()
 
 func _retry_save() -> void:
@@ -457,7 +472,10 @@ func _begin_ascent() -> void:
 		GameManager.last_result.objectives = []
 		for definition in m.objectives:
 			GameManager.last_result.objectives.append({"id":definition.id, "name":definition.name, "done":false})
-	_log("Main engine ignition aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100], 0.0)
+	var ignition := "Main engine ignition aboard %s" % GameManager.current_build.launcher.name
+	if not GameManager.attempt_is_archive:
+		ignition += " (reliability %.0f%%)" % (reliability * 100.0)
+	_log(ignition + ".", 0.0)
 	_refresh_stage_hud(1.0, 1.0)
 	_refresh_warp_buttons()
 	_refresh_flight_controls()
@@ -585,6 +603,9 @@ func _refresh_flight_controls() -> void:
 	if ignited:
 		var lockout := _ascent.stage_lockout()
 		_start.text = _ascent.stage_action()
+		if _start.text == "Deploy payload" and GameManager.current_mission.targetOrbit == "Lunar Flyby":
+			_start.text = "Ready lunar injection"
+			lockout = lockout.replace("deploying the payload", "lunar injection").replace("to deploy", "for injection")
 		_start.disabled = _ascent.scripted or not lockout.is_empty()
 		_hud_overlay.set_stage_hint("Scripted guidance has control." if _ascent.scripted else lockout)
 	else:
@@ -619,7 +640,8 @@ func _process_milestones() -> void:
 		var id: String = event.id
 		var at: float = event.t
 		_events_done[id] = true
-		_log(EVENT_LOG[id], at)
+		var lunar_handoff: bool = id == "payload_separation" and GameManager.current_mission.targetOrbit == "Lunar Flyby"
+		_log("Parking-orbit staging complete. Payload remains attached for injection." if lunar_handoff else EVENT_LOG[id], at)
 		match id:
 			"clamp_release":
 				_release_pad_clamps()
@@ -630,7 +652,8 @@ func _process_milestones() -> void:
 				_separate_fairings(at)
 				_refresh_stage_hud(0.0, _ascent.fuel / float(_ascent.stages[1].propellantKg))
 			"payload_separation":
-				_separate_payload()
+				if not lunar_handoff:
+					_separate_payload()
 				_finish_success()
 	_ascent.events.clear()
 
@@ -745,6 +768,13 @@ func _finish_success() -> void:
 			objective.done = MISSION_OBJECTIVES.reach_orbit(met_target)
 	GameManager.flight_elapsed_s = elapsed
 	GameManager.initial_orbit = orbit
+	if GameManager.current_mission.targetOrbit == "Lunar Flyby":
+		if met_target:
+			get_tree().change_scene_to_file.call_deferred("res://scenes/LunarFlyby.tscn")
+		else:
+			_log("The required 250 km parking orbit was missed. Trans-lunar injection canceled.")
+			get_tree().change_scene_to_file.call_deferred("res://scenes/Debrief.tscn")
+		return
 	SPACE_CENTER.update_atmosphere(_env_data, 100000.0)
 	if _upper_flame:
 		_upper_flame.update_thrust(0.0, _ascent.altitude)

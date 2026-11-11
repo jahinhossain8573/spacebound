@@ -270,7 +270,11 @@ func _overshot_target() -> bool:
 
 func _ready_to_coast() -> bool:
 	var goal := float(target.apogee) - 500.0
-	return coast.energy < 0.0 and coast.apoapsis >= goal and (target.circularize or coast.periapsis < float(target.radius) - CIRCULAR_TOLERANCE_M)
+	if coast.energy >= 0.0 or coast.apoapsis < goal:
+		return false
+	# A steep suborbital ascent can reach the apoapsis target long before insertion.
+	var periapsis_floor := float(target.radius) - CIRCULAR_TOLERANCE_M
+	return coast.periapsis >= periapsis_floor if target.circularize else coast.periapsis < periapsis_floor
 
 func warp_limit() -> int:
 	if clamped or altitude < 70000.0 or (engine_lit and throttle > 0.0) or (stage == 0 or not engine_lit):
@@ -298,8 +302,8 @@ func _script_controls() -> void:
 		next_stage()
 		return
 
-	# An overshoot or fuel-limited recovery prioritizes a survivable periapsis.
-	if altitude > ATMOSPHERE_M and (coast.energy >= 0.0 or (_overshot_target() and (safe_orbit() or circularization_dv() > remaining_dv()))):
+	# A ballistic apoapsis overshoot alone says little about insertion speed.
+	if altitude > ATMOSPHERE_M and (coast.energy >= 0.0 or (_overshot_target() and safe_orbit())):
 		_recovery = true
 	if _recovery and safe_orbit():
 		set_throttle(0.0)

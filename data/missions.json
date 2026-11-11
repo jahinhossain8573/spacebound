@@ -154,8 +154,8 @@
   {
     "missionNumber": 5,
     "id": "mission_5",
-    "title": "Cislunar Pathfinder (stretch)",
-    "briefing": "Send a small spacecraft on a lunar flyby. Maintain deep-space communications during the journey.",
+    "title": "Cislunar Pathfinder",
+    "briefing": "Launch from Earth and coast briefly in a 250 km parking orbit before the upper stage fires for the Moon. Correct your course for 20 lunar images, keep the deep-space link online, and return for a Pacific Ocean splashdown.",
     "targetOrbit": "Lunar Flyby",
     "targetAltitudeKm": 384400,
     "durationDays": 6,
@@ -173,7 +173,14 @@
     "budgetCapMillions": 75,
     "rewardFundsMillions": 105,
     "rewardSciencePoints": 80,
-    "unlocksTier": 4
+    "unlocksTier": 4,
+    "objectives": [
+      {"id": "trans_lunar", "name": "Reach the trans-lunar trajectory", "trigger": "trans_lunar"},
+      {"id": "correction", "name": "Fly through the 100–500 km corridor", "trigger": "lunar_corridor"},
+      {"id": "images", "name": "Capture 20 usable lunar images", "trigger": "imaging", "targetImages": 20},
+      {"id": "deep_space_link", "name": "Maintain the deep-space link", "trigger": "deep_space_link"},
+      {"id": "splashdown", "name": "Splash down in the Pacific Ocean", "trigger": "splashdown"}
+    ]
   },
   {
     "missionNumber": 7,

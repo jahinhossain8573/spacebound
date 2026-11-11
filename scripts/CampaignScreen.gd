@@ -17,6 +17,7 @@ var _active_count_label: Label
 var _mission_buttons: Dictionary = {}
 var _mission_rows: Dictionary = {}
 var _start_button: Button
+var _future_rows: Array[Label] = []
 var _filter_mode := "available"
 var _tab_buttons: Dictionary = {}
 
@@ -263,7 +264,8 @@ func _mission_select() -> void:
 	for mission in GlobalData.missions:
 		var number := int(mission.missionNumber)
 		if number == 5 and not ResourceLoader.exists("res://scenes/LunarFlyby.tscn"): continue
-		if number == 7 and not ResourceLoader.exists("res://scenes/LandingMinigame.tscn"): continue
+		if number == 7:
+			_add_future_row(list, "6. Lunar Polar Prospector")
 		var row_wrap := HBoxContainer.new()
 		row_wrap.add_theme_constant_override("separation", 0)
 		list.add_child(row_wrap)
@@ -289,6 +291,8 @@ func _mission_select() -> void:
 		_mission_buttons[number] = b
 		_mission_rows[number] = {"wrap": row_wrap, "strip": status_strip, "emblem_parent": emblem_box}
 
+	_add_future_row(list, "8. South Pole Endurance & Rover")
+
 	# Right Column: KSP Contract Dossier
 	var dossier_panel := PanelContainer.new()
 	dossier_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -308,15 +312,35 @@ func _mission_select() -> void:
 	dossier_scroll.add_child(_details)
 
 	GameManager.campaign_changed.connect(_refresh_campaign_ui)
-	_set_contract_filter("available")
-	_select_mission(GlobalData.get_mission(1))
+	var from_archive := GameManager.attempt_is_archive
+	_set_contract_filter("archives" if from_archive else "available")
+	_select_mission(GlobalData.get_mission(5 if from_archive else 1))
 	_refresh_campaign_ui()
+
+func _add_future_row(list: VBoxContainer, title: String) -> void:
+	var row := Label.new()
+	row.text = "%s\nComing after the hackathon" % title
+	row.custom_minimum_size.y = 52.0
+	row.add_theme_color_override("font_color", UI.MUTED)
+	list.add_child(row)
+	_future_rows.append(row)
+
+func _lunar_archive_selected(number: int) -> bool:
+	return _filter_mode == "archives" and number == 5
+
+func _landing_pending(number: int) -> bool:
+	return number == 7 and not ResourceLoader.exists("res://scenes/LandingMinigame.tscn")
 
 func _set_contract_filter(mode: String) -> void:
 	_filter_mode = mode
 	for key in _tab_buttons:
 		UI.style_button(_tab_buttons[key], "tab_active" if key == mode else "tab_inactive", 8, 5, 3)
-	_apply_row_visibility()
+	var selected_number := int(_selected.get("missionNumber", 0))
+	if mode == "archives" and selected_number not in GameManager.completed_missions and _mission_rows.has(5):
+		_select_mission(GlobalData.get_mission(5))
+	elif selected_number == 5:
+		_select_mission(_selected)
+	_refresh_campaign_ui()
 
 func _apply_row_visibility() -> void:
 	for number: int in _mission_rows:
@@ -325,9 +349,11 @@ func _apply_row_visibility() -> void:
 		var show_row := true
 		match _filter_mode:
 			"active": show_row = unlocked and not completed
-			"archives": show_row = completed
+			"archives": show_row = completed or number == 5
 			_: show_row = true
 		_mission_rows[number].wrap.visible = show_row
+	for row in _future_rows:
+		row.visible = _filter_mode == "available"
 
 func _select_mission(mission: Dictionary) -> void:
 	if mission.is_empty(): return
@@ -382,17 +408,19 @@ func _select_mission(mission: Dictionary) -> void:
 	if not GameManager.is_part_unlocked(mission.requiredBus):
 		missing.append(str(GlobalData.get_bus(mission.requiredBus).get("name", mission.requiredBus)))
 
+	var archive := _lunar_archive_selected(number)
+	var landing_pending := _landing_pending(number)
 	_start_button = Button.new()
-	_start_button.text = "✓ Enter VAB" if not completed else "↻ Replay Mission"
+	_start_button.text = "Start test flight" if archive else ("Coming soon" if landing_pending else ("↻ Replay Mission" if completed else "✓ Enter VAB"))
 	_start_button.custom_minimum_size = Vector2(154, 46)
 	_start_button.add_theme_font_size_override("font_size", 16)
 	UI.style_button(_start_button, "green", 14, 8, 4)
-	_start_button.disabled = not unlocked or not missing.is_empty()
+	_start_button.disabled = not archive and (landing_pending or not unlocked or not missing.is_empty())
 	_start_button.pressed.connect(_start_selected)
 	action_col.add_child(_start_button)
 
 	var exp_lbl := Label.new()
-	exp_lbl.text = "Status: Completed" if completed else ("Status: Ready" if unlocked and missing.is_empty() else "Status: Locked")
+	exp_lbl.text = "Vega-C launch pad · No campaign payout" if archive else ("Status: Completed" if completed else ("Status: Ready" if unlocked and missing.is_empty() and not landing_pending else ("Status: Unlocked" if unlocked and landing_pending else "Status: Locked")))
 	exp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	exp_lbl.add_theme_font_size_override("font_size", 12)
 	exp_lbl.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT if unlocked and missing.is_empty() else UI.KSP_AMBER)
@@ -422,7 +450,7 @@ func _select_mission(mission: Dictionary) -> void:
 	_label("Assigned Hardware:", body_col, UI.KSP_AMBER, 16)
 	_label("Launcher: %s   |   Platform: %s\nRequired Payload Parts: %s" % [launcher_name, bus_name, ", ".join(names) if not names.is_empty() else "Standardionics"], body_col, Color("d8e1eb"), 15)
 
-	if not missing.is_empty():
+	if not archive and not missing.is_empty():
 		var alert_row := HBoxContainer.new()
 		alert_row.add_theme_constant_override("separation", 10)
 		body_col.add_child(alert_row)
@@ -445,12 +473,13 @@ func _select_mission(mission: Dictionary) -> void:
 	if float(mission.get("requiredDeltaVMps", 0.0)) > 0.0:
 		_label("  • Spacecraft Maneuver Reserve: %.0f m/s Δv (+10%% margin in readiness)" % float(mission.requiredDeltaVMps), body_col, UI.KSP_CYAN, 14)
 
-	_label("Rewards:", body_col, UI.KSP_AMBER, 16)
-	_label("Completion:  +$%.2fM Funds   |   +%d SP Science%s" % [
-		mission.rewardFundsMillions,
-		mission.rewardSciencePoints,
-		("   |   Unlocks Tech Tier %d" % int(mission.unlocksTier)) if mission.has("unlocksTier") else ""
-	], body_col, UI.KSP_GREEN_TEXT, 16)
+	if not archive:
+		_label("Rewards:", body_col, UI.KSP_AMBER, 16)
+		_label("Completion:  +$%.2fM Funds   |   +%d SP Science%s" % [
+			mission.rewardFundsMillions,
+			mission.rewardSciencePoints,
+			("   |   Unlocks Tech Tier %d" % int(mission.unlocksTier)) if mission.has("unlocksTier") else ""
+		], body_col, UI.KSP_GREEN_TEXT, 16)
 
 	_refresh_button_styles()
 
@@ -468,6 +497,13 @@ func _refresh_button_styles() -> void:
 			_mission_rows[number].strip.color = UI.GOLD if completed else (UI.KSP_GREEN if unlocked else Color("4a515c"))
 
 func _start_selected() -> void:
+	var number := int(_selected.missionNumber)
+	if _lunar_archive_selected(number):
+		if GameManager.start_lunar_archive():
+			get_tree().change_scene_to_file("res://scenes/Launch.tscn")
+		return
+	if _landing_pending(number):
+		return
 	if GameManager.is_part_unlocked(_selected.requiredLauncher) and GameManager.is_part_unlocked(_selected.requiredBus) and GameManager.start_mission(int(_selected.missionNumber)):
 		get_tree().change_scene_to_file("res://scenes/Workshop.tscn")
 
@@ -491,7 +527,8 @@ func _debrief() -> void:
 		bar.value = receipt[item[1]]
 		bar.show_percentage = false
 		_body.add_child(bar)
-	_label("Payout: $%.2fM and %d SP" % [receipt.funds_millions, receipt.science_points], null, UI.KSP_CYAN, 20)
+	var payout := "Archives test flight · No campaign payout" if GameManager.attempt_is_archive else "Payout: $%.2fM and %d SP" % [receipt.funds_millions, receipt.science_points]
+	_label(payout, null, UI.KSP_CYAN, 20)
 	if not receipt.unlocks.is_empty(): _label("Unlocked: " + ", ".join(receipt.unlocks), null, Color("ff8811"))
 	if "SpaceX Falcon 9" in receipt.unlocks: _label("SpaceX Falcon 9 now available", null, Color("279af1"))
 	_label("Objectives")
@@ -524,7 +561,7 @@ func _debrief() -> void:
 		_label("Historical precedent  /  " + str(event.title), content, Color("ff8811"))
 		_label(event.precedent, content)
 	var next := UI.style_button(_button("Continue", _return_to_missions), "green", 18, 10)
-	if GameManager.save_campaign() != OK:
+	if not GameManager.attempt_is_archive and GameManager.save_campaign() != OK:
 		next.disabled = true
 		_show_save_error(func():
 			if GameManager.save_campaign() == OK:
@@ -549,13 +586,18 @@ func _refresh_campaign_ui() -> void:
 		var unlocked: bool = GameManager.is_mission_unlocked(number)
 		if unlocked: unlocked_count += 1
 		var m := GlobalData.get_mission(number)
-		button.disabled = not unlocked
+		var archive := _lunar_archive_selected(number)
+		button.disabled = not unlocked and not archive
+		if archive:
+			button.text = "5. %s\nArchives test flight" % m.title
+			continue
 		var suffix := " [Completed]" if number in GameManager.completed_missions else (" [Locked]" if button.disabled else "")
 		button.text = "%d. %s%s\n%s · $%.0fM reward" % [number, m.title, suffix, m.targetOrbit, m.rewardFundsMillions]
 	if _active_count_label:
 		_active_count_label.text = "Available Contracts: %d   [Completed: %d  |  Tech Tier: %d]" % [unlocked_count, GameManager.completed_missions.size(), GameManager.unlocked_tier]
 	if is_instance_valid(_start_button) and not _selected.is_empty():
-		_start_button.disabled = not GameManager.is_mission_unlocked(int(_selected.missionNumber)) or not GameManager.is_part_unlocked(_selected.requiredLauncher) or not GameManager.is_part_unlocked(_selected.requiredBus)
+		var number := int(_selected.missionNumber)
+		_start_button.disabled = not _lunar_archive_selected(number) and (_landing_pending(number) or not GameManager.is_mission_unlocked(number) or not GameManager.is_part_unlocked(_selected.requiredLauncher) or not GameManager.is_part_unlocked(_selected.requiredBus))
 	_apply_row_visibility()
 	_refresh_button_styles()
 

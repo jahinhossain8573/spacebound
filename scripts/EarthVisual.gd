@@ -44,6 +44,9 @@ static func make_surface(launch_plane: bool) -> ShaderMaterial:
 func set_local_detail(detail: float) -> void:
 	_surface.set_shader_parameter("local_detail", detail)
 
+func set_ocean_detail(detail: float) -> void:
+	_surface.set_shader_parameter("ocean_detail", detail)
+
 static func kennedy_basis() -> Basis:
 	var east := Vector3(-sin(KENNEDY_LONGITUDE), 0.0, -cos(KENNEDY_LONGITUDE))
 	var up := Vector3(cos(KENNEDY_LATITUDE) * cos(KENNEDY_LONGITUDE), sin(KENNEDY_LATITUDE),

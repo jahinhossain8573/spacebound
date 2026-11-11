@@ -9,6 +9,7 @@ uniform float ground_radius;
 uniform float local_detail = 0.0;
 uniform bool launch_plane = false;
 uniform float plane_weight = 1.0;
+uniform float ocean_detail = 0.0;
 
 varying vec3 globe_point;
 varying vec2 plane_position;
@@ -62,6 +63,15 @@ void fragment() {
 		vec4 pad = texture(pad_ground, pad_uv);
 		detail.rgb = mix(detail.rgb, pad.rgb, edge_weight(pad_uv, 0.15) * pad.a);
 		base = mix(base, detail.rgb, detail.a * edge_weight(local_uv, 0.02) * local_detail);
+	}
+	if (ocean_detail > 0.0) {
+		// Local wave shading for the open-ocean recovery camera.
+		vec2 p = lon_lat * 6371.0;
+		float waves = sin(p.y * 2.4 + sin(p.x * 1.6) * 1.2 + TIME * 0.8);
+		waves += 0.45 * sin(dot(p, vec2(2.0, 4.5)) - TIME * 1.4);
+		float crest = smoothstep(0.45, 1.35, waves);
+		float detail = ocean_detail * (1.0 - smoothstep(0.2, 0.7, length(fwidth(p))));
+		base = mix(base, base * (0.94 + crest * 0.21) + vec3(0.009, 0.014, 0.018) * crest, detail);
 	}
 	ALBEDO = base;
 	ROUGHNESS = 0.85;
