@@ -2,6 +2,7 @@ extends Control
 
 signal build_changed
 
+const ELECTRON_MODEL := preload("res://assets/3d-models/rockets/electron/launcher_electron.glb")
 const CATEGORIES := ["power", "avionics", "adcs", "comms", "propulsion", "instrument", "thermal", "landing"]
 var mission: Dictionary
 var launcher: Dictionary
@@ -59,6 +60,8 @@ func _make_ui() -> void:
 	back.text = "< Back"
 	back.pressed.connect(_back)
 	header.add_child(back)
+	if launcher.id == "launcher_electron":
+		_add_electron_preview(header)
 	var title := Label.new()
 	title.text = "  WORKSHOP   /   " + str(mission.title) + "\n  " + str(launcher.name) + "   •   " + str(bus.name)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -191,6 +194,31 @@ func _make_ui() -> void:
 	right.add_child(review_button)
 	_telemetry = VBoxContainer.new()
 	right.add_child(_telemetry)
+
+func _add_electron_preview(header: HBoxContainer) -> void:
+	var container := SubViewportContainer.new()
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(container)
+	var viewport := SubViewport.new()
+	viewport.name = "ElectronPreview"
+	viewport.size = Vector2i(64, 64)
+	viewport.transparent_bg = true
+	viewport.own_world_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	container.add_child(viewport)
+	var model := ELECTRON_MODEL.instantiate() as Node3D
+	model.rotation.z = -0.65
+	model.position = -(model.basis * Vector3(0, 9, 0))
+	viewport.add_child(model)
+	var camera := Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 20.0
+	camera.position.z = 25.0
+	viewport.add_child(camera)
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-15, 30, 0)
+	light.light_energy = 2.6
+	viewport.add_child(light)
 
 func _make_world() -> void:
 	var viewport: SubViewport = _viewport_container.get_child(0)

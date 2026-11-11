@@ -19,19 +19,26 @@ func run_tests() -> void:
 	launch.set_process(false)
 	check(is_equal_approx(launch.calculate_reliability(0.95,["L7","L8","L9"]),0.99), "reliability capped")
 	check(is_equal_approx(launch.calculate_reliability(0.88,["L7","L9"]),0.92), "owned reliability nodes")
+	check(launch._stage.find_children("*", "MeshInstance3D", true, false).size() >= 10, "Electron uses imported booster meshes")
+	check(launch._booster_flame.get_parent().name == "exhaust_stage_1" and launch._upper_flame.get_parent().name == "exhaust_stage_2", "Electron plumes use the imported exhaust markers")
 	manager.debug_disable_reliability = true
 	launch.ignite()
 	var id: String = manager.attempt_id
 	check(launch.ignited and not launch.failed and manager.has_launched_once and not launch._skip.visible, "first liftoff cannot skip")
 	launch.ignite()
 	check(manager.last_result.flight_log.size() == 1 and manager.attempt_id == id, "duplicate ignition ignored")
+	check(launch._booster_flame.visible and not launch._upper_flame.visible, "only the booster plume is visible at liftoff")
 	launch.advance_ascent(6.0)
+	check(launch._stage.get_parent() == launch._root3d and launch._interstage.get_parent() == launch._stage, "Electron booster takes its interstage at separation")
+	check(not launch._booster_flame.visible and launch._upper_flame.visible, "Electron switches to the upper-stage plume")
 	check(launch.stage_separated and not launch.fairing_separated, "stage at 40 percent")
 	launch.advance_ascent(3.0)
 	check(launch.fairing_separated and manager.last_result.flight_log.size() == 3, "fairing at 60 percent")
+	check(launch._fairing_left.get_parent() == launch._root3d and launch._fairing_right.get_parent() == launch._root3d, "both imported fairing halves detach")
 	check(not launch._station.visible, "station disappears during ascent")
 	launch.advance_ascent(6.0)
 	check(launch.finished and manager.last_result.launched and manager.last_result.objectives[0].done and manager.initial_orbit.semi_major_axis_km == 6771.0 and manager.flight_elapsed_s == 15.0, "successful LEO handoff")
+	check(not launch._upper_flame.visible, "Electron upper-stage plume stops at orbital insertion")
 	var shared = launch._flight
 	var rocket = launch._rocket
 	var camera = launch._camera

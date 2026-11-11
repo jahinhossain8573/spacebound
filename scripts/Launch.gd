@@ -1,5 +1,6 @@
 extends Control
 
+const ELECTRON_MODEL := preload("res://assets/3d-models/rockets/electron/launcher_electron.glb")
 const ASCENT_SECONDS := 15.0
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 var rng := RandomNumberGenerator.new()
@@ -17,6 +18,9 @@ var rocket_height := 18.0
 var _root3d: Node3D
 var _rocket: Node3D
 var _stage: Node3D
+var _interstage: Node3D
+var _booster_flame: MeshInstance3D
+var _upper_flame: MeshInstance3D
 var _fairing_left: Node3D
 var _fairing_right: Node3D
 var _camera: Camera3D
@@ -63,7 +67,7 @@ func _ready() -> void:
 	can_skip = GameManager.has_launched_once
 	rocket_height = {"launcher_electron":18.0, "launcher_vega_c":35.0, "launcher_falcon_9":70.0}.get(build.launcher.id, 18.0)
 	rng.randomize()
-	_create_world()
+	_create_world(build.launcher.id)
 
 func _create_ui() -> void:
 	var layout := VBoxContainer.new()
@@ -141,7 +145,7 @@ func _box(parent: Node3D, size: Vector3, position: Vector3, color: Color) -> voi
 	item.material_override = _material(color)
 	parent.add_child(item)
 
-func _create_world() -> void:
+func _create_world(launcher_id: String) -> void:
 	var env := WorldEnvironment.new()
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
@@ -168,9 +172,44 @@ func _create_world() -> void:
 	_root3d.add_child(_station)
 	_box(_station, Vector3(35, 1, 35), Vector3(0,-1,0), Color("454f5b"))
 	_box(_station, Vector3(2, rocket_height*0.85, 2), Vector3(-rocket_height*0.16,rocket_height*0.425,0), Color("596675"))
+	var radius := rocket_height * 0.045
+	if launcher_id == "launcher_electron":
+		_create_electron()
+		var rim := DirectionalLight3D.new()
+		rim.rotation_degrees = Vector3(-15, 70, 0)
+		rim.light_energy = 1.4
+		_root3d.add_child(rim)
+	else:
+		_create_placeholder_rocket(radius)
+	_flash = MeshInstance3D.new()
+	var flash_mesh := SphereMesh.new()
+	flash_mesh.radius = radius
+	flash_mesh.height = radius*2
+	_flash.mesh = flash_mesh
+	_flash.material_override = _material(Color("ffb300"), true)
+	_flash.visible = false
+	_root3d.add_child(_flash)
+	_camera = Camera3D.new()
+	_camera.current = true
+	_camera.near = 0.5
+	_camera.far = 2000000.0
+	_root3d.add_child(_camera)
+	_update_camera()
+
+func _create_electron() -> void:
+	_rocket = ELECTRON_MODEL.instantiate()
+	_root3d.add_child(_rocket)
+	var model := _rocket.get_node("launcher_electron")
+	_stage = model.get_node("stage_1")
+	_interstage = model.get_node("interstage")
+	_fairing_left = model.get_node("fairing_left")
+	_fairing_right = model.get_node("fairing_right")
+	_booster_flame = _create_flame(_stage.get_node("exhaust_stage_1"), 0.54, -rocket_height * 0.06)
+	_upper_flame = _create_flame(model.get_node("stage_2/exhaust_stage_2"), 0.32, -rocket_height * 0.06)
+
+func _create_placeholder_rocket(radius: float) -> void:
 	_rocket = Node3D.new()
 	_root3d.add_child(_rocket)
-	var radius := rocket_height * 0.045
 	_stage = Node3D.new()
 	_rocket.add_child(_stage)
 	_cylinder(_stage, radius, rocket_height*0.5, rocket_height*0.25, Color("d5dce3"))
@@ -187,25 +226,15 @@ func _create_world() -> void:
 		_box(fairing, Vector3(radius*0.85,rocket_height*0.13,radius*1.5), Vector3(side*radius*0.43,rocket_height*0.865,0), Color("cbd5df"))
 		var tip := _cylinder(fairing, radius*0.7, rocket_height*0.14, rocket_height*0.985, Color("cbd5df"), true)
 		tip.position.x = side*radius*0.25
-	var flame := _cylinder(_stage, radius*0.6, rocket_height*0.12, -rocket_height*0.12, Color("ffb300"), true)
+	_booster_flame = _create_flame(_stage, radius * 0.6, -rocket_height * 0.12)
+
+func _create_flame(parent: Node3D, radius: float, y: float) -> MeshInstance3D:
+	var flame := _cylinder(parent, radius, rocket_height * 0.12, y, Color("ffb300"), true)
 	flame.rotation.z = PI
 	flame.material_override = _material(Color("ffb300"), true)
 	flame.name = "Flame"
 	flame.visible = false
-	_flash = MeshInstance3D.new()
-	var flash_mesh := SphereMesh.new()
-	flash_mesh.radius = radius
-	flash_mesh.height = radius*2
-	_flash.mesh = flash_mesh
-	_flash.material_override = _material(Color("ffb300"), true)
-	_flash.visible = false
-	_root3d.add_child(_flash)
-	_camera = Camera3D.new()
-	_camera.current = true
-	_camera.near = 0.5
-	_camera.far = 2000000.0
-	_root3d.add_child(_camera)
-	_update_camera()
+	return flame
 
 func calculate_reliability(base: float, nodes: Array) -> float:
 	var result := base
@@ -243,7 +272,7 @@ func _begin_ascent() -> void:
 	_start.disabled = true
 	_skip.visible = can_skip
 	_skip.disabled = failed
-	_stage.get_node("Flame").visible = true
+	_booster_flame.visible = true
 	var m: Dictionary = GameManager.current_mission
 	var stats: Dictionary = GameManager.current_build.stats
 	GameManager.last_result = {"mission_number":int(m.missionNumber), "attempt_id":GameManager.attempt_id, "launched":false, "objectives":[{"name":"Reach starting orbit", "done":false}, {"name":"Survive mission duration", "done":false}, {"name":"Mission objective", "done":false}], "total_cost_m":stats.get("cost_millions",0.0), "mass_margin_pct":stats.get("mass_margin_pct",0.0), "events_fired":[], "flight_log":[]}
@@ -293,8 +322,12 @@ func advance_ascent(delta: float) -> void:
 func _process_milestones(time: float) -> void:
 	if not stage_separated and time >= 0.4*ASCENT_SECONDS:
 		stage_separated = true
+		if _interstage:
+			_interstage.reparent(_stage, true)
 		_stage.reparent(_root3d, true)
-		_stage.get_node("Flame").visible = false
+		_booster_flame.visible = false
+		if _upper_flame:
+			_upper_flame.visible = true
 		create_tween().tween_property(_stage,"position:y",_stage.position.y-rocket_height*2,4.0)
 		_log("Stage separation nominal.", 6.0)
 	if not fairing_separated and time >= 0.6*ASCENT_SECONDS:
@@ -329,6 +362,8 @@ func _finish_failure() -> void:
 func _finish_success() -> void:
 	if finished: return
 	finished = true
+	if _upper_flame:
+		_upper_flame.visible = false
 	_log("Orbital insertion nominal.")
 	GameManager.last_result.launched = true
 	for objective in GameManager.last_result.objectives:

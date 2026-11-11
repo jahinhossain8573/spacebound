@@ -23,6 +23,7 @@ func run_tests() -> void:
 	root.add_child(workshop)
 	workshop.build_changed.connect(changed)
 	check(workshop.mission.missionNumber == 1 and workshop.launcher.id == "launcher_electron", "mission 1 defaults")
+	check(workshop.find_child("ElectronPreview", true, false) is SubViewport, "Electron model preview appears in the Workshop header")
 	check(workshop.bus.id == "bus_cubesat_1u_3u", "mission 1 bus")
 	check(not workshop.add_part("av_bae_rad750"), "locked part rejected")
 	check(workshop.add_part("pwr_gomspace_p31u"), "add panel")
