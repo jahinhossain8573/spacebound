@@ -11,6 +11,7 @@ const SPACE_CENTER = preload("res://scripts/SpaceCenterWorld.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const LIVE_ASCENT = preload("res://scripts/LiveAscent.gd")
 const ORBIT_PLOTTER = preload("res://scripts/OrbitPlotter.gd")
+const ORBIT_MAP_MARKER := preload("res://scripts/OrbitMapMarker.gd")
 const FLIGHT_PREFERENCES = preload("res://scripts/FlightPreferences.gd")
 const UI = preload("res://scripts/UIStyle.gd")
 
@@ -80,7 +81,7 @@ var _step_budget := 0.0
 var _guidance_enabled := true
 var _map_view := false
 var _map_plot: MeshInstance3D
-var _map_marker: MeshInstance3D
+var _map_marker: ORBIT_MAP_MARKER
 var _map_yaw := 0.12
 var _map_pitch := 0.18
 var _map_distance := 19000000.0
@@ -326,13 +327,7 @@ func _create_world() -> void:
 	_map_plot.transform = Transform3D(Basis(Vector3.UP, Vector3.BACK, Vector3.RIGHT).scaled(Vector3.ONE * MAP_SCALE), _earth_spin.position)
 	_map_plot.hide()
 	_anchor.add_child(_map_plot)
-	_map_marker = MeshInstance3D.new()
-	var marker_mesh := SphereMesh.new()
-	marker_mesh.radius = 0.5
-	marker_mesh.height = 1.0
-	_map_marker.mesh = marker_mesh
-	_map_marker.material_override = _material(Color("58e7ff"), true)
-	_map_marker.hide()
+	_map_marker = ORBIT_MAP_MARKER.new(Color("58e7ff"))
 	_root3d.add_child(_map_marker)
 	place_craft(0.0, EARTH_RADIUS_M)
 	_update_camera()
@@ -885,8 +880,6 @@ func _update_map() -> void:
 	if _map_refresh <= 0.0:
 		_map_plot.redraw_coast(c)
 		_map_refresh = 0.12
-	var diameter := 14.0 * _camera.position.length() * tan(deg_to_rad(_camera.fov) * 0.5) / maxf(1.0, _launch_view.size.y)
-	_map_marker.scale = Vector3.ONE * diameter
 	var pe := float(c.periapsis)
 	var ap := float(c.apoapsis)
 	var period := float(c.period)
@@ -921,6 +914,8 @@ func _update_camera() -> void:
 		_camera.near = 1000.0
 		_camera.position = center + Vector3(sin(_map_yaw) * cos(_map_pitch), sin(_map_pitch), cos(_map_yaw) * cos(_map_pitch)) * _map_distance
 		_camera.look_at(center, Vector3.UP)
+		var direction := _rocket.global_basis.y if _ascent.clamped else Vector3(_ascent.vx, _ascent.vy, 0.0)
+		_map_marker.aim(_camera, direction, _launch_view.size.y)
 		update_world_visibility(200000000.0)
 		return
 	var target := focus_point()

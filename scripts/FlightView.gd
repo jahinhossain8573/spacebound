@@ -5,6 +5,7 @@ const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const UI = preload("res://scripts/UIStyle.gd")
 const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const ORBIT_MAP_MARKER := preload("res://scripts/OrbitMapMarker.gd")
 const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
 var mission: Dictionary = {}
@@ -16,7 +17,8 @@ var altitude_km := 0.0
 var speed_kms := 0.0
 var in_eclipse := false
 var _plotter
-var _marker: MeshInstance3D
+var _marker: ORBIT_MAP_MARKER
+var _map_direction := Vector3.ZERO
 var _camera: Camera3D
 var _earth: EARTH_VISUAL
 var _view: SubViewportContainer
@@ -154,16 +156,7 @@ func _build_scene() -> void:
 	_plotter = preload("res://scripts/OrbitPlotter.gd").new()
 	world.add_child(_plotter)
 	_plotter.visible = false
-	_marker = MeshInstance3D.new()
-	var marker_mesh := SphereMesh.new()
-	marker_mesh.radius = 0.5
-	marker_mesh.height = 1.0
-	_marker.mesh = marker_mesh
-	var cyan := StandardMaterial3D.new()
-	cyan.albedo_color = Color("00e5ff")
-	cyan.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_marker.material_override = cyan
-	_marker.visible = false
+	_marker = ORBIT_MAP_MARKER.new(Color("00e5ff"))
 	world.add_child(_marker)
 	_craft_visual = Node3D.new()
 	world.add_child(_craft_visual)
@@ -240,7 +233,7 @@ func set_orbit(value: OrbitState) -> bool:
 	orbit = value.copy()
 	orbit.time_since_periapsis_s = fposmod(orbit.time_since_periapsis_s, period)
 	_error.text = ""
-	_marker.visible = true
+	_marker.visible = _map_view
 	_plotter.redraw(orbit)
 	_update_position()
 	if initial_orbit: set_camera_preset(_camera_mode)
@@ -323,10 +316,6 @@ func _process(delta: float) -> void:
 			_burn_panel.start_planned_burn()
 	if orbit != null:
 		_update_camera()
-		var pixels := maxf(1.0, float(_view.size.y))
-		var diameter := 8.0 * 2.0 * _camera.global_position.distance_to(_marker.global_position) * tan(deg_to_rad(_camera.fov) * 0.5) / pixels
-		_marker.scale = Vector3.ONE * maxf(0.5, diameter) if _map_view else Vector3.ONE
-		_marker.visible = _map_view
 		if _map_view: _update_map_readout()
 		_craft_visual.visible = not _map_view and shared_launch == null
 		_craft_visual.position = _marker.position
@@ -339,10 +328,12 @@ func _update_position() -> void:
 	pos.y *= orbit.direction
 	position_km = pos.rotated(orbit.arg_periapsis_rad)
 	_marker.position = Vector3(position_km.x, 0.0, position_km.y) * FlightSim.RENDER_SCALE
+	_map_direction = Vector3(velocity.x, 0.0, velocity.y)
 	var preview_nose := _craft_visual.global_basis.x
 	var nose := Vector2(preview_nose.x, preview_nose.z)
 	if is_instance_valid(_shared_rocket):
 		_marker.position = Vector3(position_km.y * 1000.0, position_km.x * 1000.0 - 6371000.0, 0)
+		_map_direction = Vector3(velocity.y, velocity.x, 0.0)
 		shared_launch.place_craft(position_km.y * 1000.0, position_km.x * 1000.0)
 		var rocket_nose := _shared_rocket.global_basis.y
 		nose = Vector2(rocket_nose.y, rocket_nose.x)
@@ -448,6 +439,8 @@ func _update_camera() -> void:
 		target += _map_pan
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
+	if _map_view:
+		_marker.aim(_camera, _map_direction, _view.size.y)
 	if is_instance_valid(shared_launch):
 		shared_launch.update_world_visibility(100000000.0 if _map_view else 2000000.0)
 	elif is_instance_valid(_earth):
