@@ -112,7 +112,13 @@ Run `godot --headless --path . --script res://tests/test_balance.gd` for full re
 
 ## Continuous launch and flight
 
-The scripted ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the rocket's position and camera framing. Right-drag and the wheel control the camera, and M switches between flight and map view. The launch remains scripted and the ascent is visually compressed to 15 seconds.
+The ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the craft's position and camera framing. Right-drag and the wheel control the camera, and M switches between flight and map view.
+
+The ascent is simulated with physics in `scripts/AscentSim.gd`: per-stage thrust that rises from sea-level to vacuum values, propellant burn-off, inverse-square gravity, exponential-atmosphere drag and the launch site's rotation (eastward launches gain speed, sun-synchronous ones lose a little). The first stage rises vertically, pitches over and flies a gravity turn. The upper stage burns into a transfer orbit with a 200 km perigee, or 250 km for GTO, then for circular targets coasts to apogee and circularizes. Stage figures are in each launcher's `ascent` block in `data/launchers.json`. Electron's upper stage carries effective values, standing in for its Kick Stage, so readiness-approved payloads reach every mission orbit.
+
+The simulated flight plays back in about 45 seconds. The powered ascent takes 30 seconds, the coast to apogee is fast-forwarded, and the final burn and payload separation play at half speed. Events follow the real sequence: Max-Q, MECO, stage separation, second-stage ignition, fairing separation above 110 km, cutoff, circularization, and payload separation. The flight log records their simulated times. Spent stages and fairing halves fall on their own ballistic trajectories. After separation, the upper stage backs away, the camera moves in to the satellite, and its deployables open. The rocket stays at the render origin while Earth moves around it (a floating origin), so close-up views do not shake.
+
+Run `godot --headless --path . --script res://tests/test_ascent.gd` to fly every mission at a light payload and at the readiness limit (90% of capacity), checking the final orbit, event order, max-Q and MECO altitudes.
 
 `godot --headless --path . --script res://tests/test_launch.gd` checks staging, station visibility, insertion continuity, shared camera/viewport ownership, and map switching. Launch, orbit, power, and campaign checks passed. A temporary Web preview was checked from pad through orbit and back from map view; a native run reported no rendering errors.
 

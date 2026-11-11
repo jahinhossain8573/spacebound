@@ -1,9 +1,17 @@
 extends Control
 
-const ASCENT_SECONDS := 15.0
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
+const ASCENT = preload("res://scripts/AscentSim.gd")
+## Playback seconds for each part of the simulated flight: powered ascent, the fast-forwarded
+## coast to apogee, and the final burn and payload separation (at a fixed slow-motion rate).
+const POWERED_PLAYBACK := 30.0
+const COAST_PLAYBACK := 4.0
+const FINAL_PLAYBACK_RATE := 2.0
+const EVENT_LOG := {"max_q": "Max-Q.", "meco": "Main engine cutoff.", "stage_separation": "Stage separation.", "upper_ignition": "Second stage ignition.", "fairing": "Fairing separation.", "cutoff": "Second stage cutoff.", "circularization": "Circularization burn at apogee.", "circularization_cutoff": "Orbit circularized.", "payload_separation": "Payload separation."}
+## Total playback length of the ascent, set from the simulated flight.
+var ascent_duration := 40.0
 var rng := RandomNumberGenerator.new()
 var countdown := 10.0
 var elapsed := 0.0
@@ -41,8 +49,20 @@ var _camera_dragging := false
 var _launch_view: SubViewportContainer
 var _station: Node3D
 var _flight: Control
+var _trajectory: Dictionary
+var _segments: Array[Dictionary] = []
+var _events_done: Dictionary = {}
+var _debris: Array[Dictionary] = []
+var _sim_time := 0.0
+var _model: Node3D
+var _payload_view_distance := 4.0
+## Floating origin: the rocket stays at the render origin and _anchor, which holds Earth, the pad
+## and the map view, moves the other way. Single-precision positions 6,000 km from the origin
+## round to half a metre, which would shake a close-up camera.
+var _anchor: Node3D
+var _craft_x := 0.0
+var _craft_y := EARTH_RADIUS_M
 const EARTH_RADIUS_M := 6371000.0
-const INSERTION_ANGLE := 0.02
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.LAUNCH
@@ -71,8 +91,45 @@ func _ready() -> void:
 	rocket_height = {"launcher_electron":18.0, "launcher_vega_c":35.0, "launcher_falcon_9":70.0}.get(build.launcher.id, 18.0)
 	focus_height = rocket_height * 0.5
 	_upper_focus = rocket_height * 0.75
+	_simulate_ascent(build, mission)
 	rng.randomize()
 	_create_world()
+
+## Simulates the whole flight once and lays out its playback timeline.
+func _simulate_ascent(build: Dictionary, mission: Dictionary) -> void:
+	var ascent: Dictionary = build.launcher.ascent
+	_trajectory = ASCENT.simulate(ascent, float(build.stats.get("wet_mass_kg", 0.0)), ASCENT.target_for(mission, ascent))
+	var events: Dictionary = _trajectory.events
+	var powered_end: float = events.cutoff + 3.0
+	_segments = [{"sim": Vector2(0.0, powered_end), "play": POWERED_PLAYBACK}]
+	var final_start := powered_end
+	if events.has("circularization"):
+		final_start = maxf(powered_end, events.circularization - 3.0)
+		_segments.append({"sim": Vector2(powered_end, final_start), "play": COAST_PLAYBACK})
+	_segments.append({"sim": Vector2(final_start, events.end), "play": (events.end - final_start) / FINAL_PLAYBACK_RATE})
+	ascent_duration = 0.0
+	for segment in _segments:
+		ascent_duration += segment.play
+
+func sim_time_at(playback: float) -> float:
+	var start := 0.0
+	for segment in _segments:
+		if playback <= start + segment.play:
+			return lerpf(segment.sim.x, segment.sim.y, clampf((playback - start) / segment.play, 0.0, 1.0))
+		start += segment.play
+	return _segments.back().sim.y
+
+## Playback second at which a simulated event happens, or -1 if the flight has no such event.
+func event_time(event: String) -> float:
+	if not _trajectory.events.has(event):
+		return -1.0
+	var t: float = _trajectory.events[event]
+	var start := 0.0
+	for segment in _segments:
+		if t <= segment.sim.y:
+			return start + segment.play * (t - segment.sim.x) / maxf(0.001, segment.sim.y - segment.sim.x)
+		start += segment.play
+	return ascent_duration
 
 func _create_ui() -> void:
 	var layout := VBoxContainer.new()
@@ -163,6 +220,9 @@ func _create_world() -> void:
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45,-25,0)
 	_root3d.add_child(light)
+	_anchor = Node3D.new()
+	_anchor.name = "EarthAnchor"
+	_root3d.add_child(_anchor)
 	var planet := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = EARTH_RADIUS_M
@@ -172,10 +232,10 @@ func _create_world() -> void:
 	planet.mesh = sphere
 	planet.position.y = -EARTH_RADIUS_M - 2.0
 	planet.material_override = _material(Color("2462b3"))
-	_root3d.add_child(planet)
+	_anchor.add_child(planet)
 	_station = Node3D.new()
 	_station.name = "LaunchStation"
-	_root3d.add_child(_station)
+	_anchor.add_child(_station)
 	_box(_station, Vector3(35, 1, 35), Vector3(0,-0.5,0), Color("454f5b"))
 	_box(_station, Vector3(2, rocket_height*0.85, 2), Vector3(-rocket_height*0.16,rocket_height*0.425,0), Color("596675"))
 	_rocket = Node3D.new()
@@ -204,6 +264,7 @@ func _create_world() -> void:
 ## Separable sections come from the launcher model; the first stage and interstage fall away
 ## together, and the player's spacecraft rides on payload_mount.
 func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
+	_model = model
 	_rocket.add_child(model)
 	_stage = Node3D.new()
 	_rocket.add_child(_stage)
@@ -225,8 +286,10 @@ func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
 	if mount and _payload:
 		_payload.name = "Payload"
 		mount.add_child(_payload)
+		var dims := SPACECRAFT.dimensions_of(build.bus)
 		# Front end up, so end-mounted antennas deploy clear of the payload adapter.
-		_payload.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, SPACECRAFT.dimensions_of(build.bus).z / 2.0, 0))
+		_payload.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, dims.z / 2.0, 0))
+		_payload_view_distance = maxf(dims.x, maxf(dims.y, dims.z)) * 6.0
 
 func _add_flame(parent: Node3D, exhaust: Node3D, size := 1.0) -> MeshInstance3D:
 	var height := rocket_height * 0.12 * size
@@ -260,6 +323,10 @@ func _assemble_primitive_rocket() -> void:
 	flame.material_override = _material(Color("ffb300"), true)
 	flame.name = "Flame"
 	flame.visible = false
+	var upper_exhaust := Node3D.new()
+	upper_exhaust.position.y = rocket_height * 0.5
+	_rocket.add_child(upper_exhaust)
+	_upper_flame = _add_flame(_rocket, upper_exhaust, 0.35)
 
 func calculate_reliability(base: float, nodes: Array) -> float:
 	var result := base
@@ -275,7 +342,7 @@ func ignite() -> void:
 	if OS.is_debug_build():
 		if GameManager.debug_disable_reliability: failed = false
 		if GameManager.debug_force_launch_failure: failed = true
-	failure_at = rng.randf_range(0.1, 0.9) * ASCENT_SECONDS if failed else 0.0
+	failure_at = rng.randf_range(0.1, 0.9) * ascent_duration if failed else 0.0
 	GameManager.has_launched_once = true
 	if GameManager.save_campaign() != OK:
 		_warning.text = "Could not save launch history. Retry before launch."
@@ -297,7 +364,6 @@ func _begin_ascent() -> void:
 	_start.disabled = true
 	_skip.visible = can_skip
 	_skip.disabled = failed
-	_stage.get_node("Flame").visible = true
 	var m: Dictionary = GameManager.current_mission
 	var stats: Dictionary = GameManager.current_build.stats
 	GameManager.last_result = {"mission_number":int(m.missionNumber), "attempt_id":GameManager.attempt_id, "launched":false, "objectives":[{"name":"Reach starting orbit", "done":false}, {"name":"Survive mission duration", "done":false}, {"name":"Mission objective", "done":false}], "total_cost_m":stats.get("cost_millions",0.0), "mass_margin_pct":stats.get("mass_margin_pct",0.0), "events_fired":[], "flight_log":[]}
@@ -305,7 +371,8 @@ func _begin_ascent() -> void:
 		GameManager.last_result.objectives = []
 		for definition in m.objectives:
 			GameManager.last_result.objectives.append({"id":definition.id, "name":definition.name, "done":false})
-	_log("Liftoff aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100])
+	_log("Liftoff aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100], 0.0)
+	_apply_sample(ASCENT.sample_at(_trajectory.samples, 0.0))
 
 func _process(delta: float) -> void:
 	if finished: return
@@ -324,46 +391,121 @@ func _process(delta: float) -> void:
 
 func advance_ascent(delta: float) -> void:
 	if not ignited or finished or _failure_timer > 0.0: return
-	var next := minf(ASCENT_SECONDS, elapsed + maxf(0.0,delta))
+	var next := minf(ascent_duration, elapsed + maxf(0.0,delta))
 	if failed and next >= failure_at:
-		_process_milestones(failure_at)
-		elapsed = failure_at
+		next = failure_at
+	elapsed = next
+	_sim_time = sim_time_at(elapsed)
+	_process_milestones(_sim_time)
+	_update_debris(_sim_time)
+	var sample := ASCENT.sample_at(_trajectory.samples, _sim_time)
+	_apply_sample(sample)
+	if failed and elapsed >= failure_at:
 		_explode()
 		return
-	_process_milestones(next)
-	elapsed = next
-	var progress := elapsed / ASCENT_SECONDS
-	var smooth := progress * progress * (3.0 - 2.0 * progress)
-	var target_altitude: float = 250000.0 if GameManager.current_mission.targetOrbit in ["GEO", "GTO"] else float(GameManager.current_mission.targetAltitudeKm) * 1000.0
-	var radius_m := EARTH_RADIUS_M + target_altitude * smooth
-	var angle := INSERTION_ANGLE * smooth
-	_rocket.position = Vector3(radius_m * sin(angle), radius_m * cos(angle) - EARTH_RADIUS_M, 0)
-	_station.visible = progress < 0.22
-	_rocket.rotation.z = -progress*0.8
-	_status.text = "ASCENT  T+%.1f s" % elapsed
+	var speed: float = sample.velocity.length() / 1000.0
+	var altitude: float = (sample.position.length() - EARTH_RADIUS_M) / 1000.0
+	var coasting: bool = _events_done.has("cutoff") and not _events_done.has("circularization") and _trajectory.events.has("circularization")
+	_status.text = "T+%s   ALT %.0f km   %.2f km/s   STAGE %d%s" % [_clock(_sim_time), altitude, speed, sample.stage + 1, "   COASTING TO APOGEE" if coasting else ""]
 	_update_camera()
-	if elapsed >= ASCENT_SECONDS: _finish_success()
+	if elapsed >= ascent_duration: _finish_success()
 
-func _process_milestones(time: float) -> void:
-	if not stage_separated and time >= 0.4*ASCENT_SECONDS:
-		stage_separated = true
-		_stage.reparent(_root3d, true)
-		_stage.get_node("Flame").visible = false
-		if _upper_flame: _upper_flame.visible = true
-		create_tween().tween_property(self, "focus_height", _upper_focus, 2.0)
-		create_tween().tween_property(_stage,"position:y",_stage.position.y-rocket_height*2,4.0)
-		_log("Stage separation nominal.", 6.0)
-	if not fairing_separated and time >= 0.6*ASCENT_SECONDS:
-		fairing_separated = true
-		for fairing in [_fairing_left,_fairing_right]:
-			fairing.reparent(_root3d, true)
-			var direction := -1.0 if fairing == _fairing_left else 1.0
-			create_tween().tween_property(fairing,"position:x",fairing.position.x + direction*rocket_height,4.0)
-		_log("Fairing separation nominal.", 9.0)
+## Places the rocket at a simulated state: position on the orbital plane, nose along the thrust
+## direction, and flames on whichever stage is firing.
+func _apply_sample(sample: Dictionary) -> void:
+	var position: Vector2 = sample.position
+	var up := position.normalized()
+	var axis := Vector2(up.y, -up.x) * cos(sample.pitch) + up * sin(sample.pitch)
+	place_craft(position.x, position.y)
+	_rocket.rotation.z = atan2(-axis.x, axis.y)
+	_station.visible = position.length() - EARTH_RADIUS_M < 5000.0
+	if is_instance_valid(_stage) and _stage.has_node("Flame"):
+		_stage.get_node("Flame").visible = _firing("liftoff", "meco")
+	if _upper_flame:
+		_upper_flame.visible = _firing("upper_ignition", "cutoff") or _firing("circularization", "circularization_cutoff")
+
+func _firing(start: String, stop: String) -> bool:
+	var events: Dictionary = _trajectory.events
+	return ignited and events.has(start) and _sim_time >= events[start] and _sim_time < events.get(stop, INF)
+
+func _process_milestones(sim_time: float) -> void:
+	var events: Dictionary = _trajectory.events
+	for event in ["max_q", "meco", "stage_separation", "upper_ignition", "fairing", "cutoff", "circularization", "circularization_cutoff", "payload_separation"]:
+		if _events_done.has(event) or not events.has(event) or events[event] > sim_time:
+			continue
+		_events_done[event] = true
+		_log(EVENT_LOG[event], events[event])
+		if event in ["stage_separation", "fairing"]:
+			_apply_sample(ASCENT.sample_at(_trajectory.samples, events[event]))
+		match event:
+			"stage_separation": _separate_stage(events[event])
+			"fairing": _separate_fairings(events[event])
+			"cutoff": _clear_debris()
+			"payload_separation": _separate_payload()
+
+func _separate_stage(at: float) -> void:
+	stage_separated = true
+	_add_debris(_stage, at, Vector2(0.0, -2.0), 0.15)
+	create_tween().tween_property(self, "focus_height", _upper_focus, 2.0)
+
+func _separate_fairings(at: float) -> void:
+	fairing_separated = true
+	_add_debris(_fairing_left, at, Vector2(-4.0, 0.0), 0.6)
+	_add_debris(_fairing_right, at, Vector2(4.0, 0.0), -0.6)
+
+## The satellite leaves the upper stage, which backs away and tumbles slowly; the camera moves in.
+func _separate_payload() -> void:
+	if not _payload or not _model:
+		return
+	_payload.reparent(_rocket)
+	var tween := create_tween().set_parallel()
+	tween.tween_property(self, "focus_height", _payload.position.y, 3.0)
+	tween.tween_property(self, "_camera_distance", _payload_view_distance / rocket_height, 3.0)
+	tween.tween_property(_model, "position:y", _model.position.y - 40.0, 60.0)
+	tween.tween_property(_model, "rotation:z", 0.4, 60.0)
+	get_tree().create_timer(2.0).timeout.connect(_deploy_payload)
+
+func _deploy_payload() -> void:
+	if not is_instance_valid(_payload):
+		return
+	for player: AnimationPlayer in _payload.find_children("*", "AnimationPlayer", true, false):
+		if player.has_animation("deploy"): player.play("deploy")
+
+## Separated hardware coasts on its own trajectory under gravity, starting from the rocket's state
+## plus a separation push given in the rocket's frame (x across, y along the nose).
+func _add_debris(node: Node3D, at: float, push: Vector2, spin: float) -> void:
+	node.reparent(_root3d, true)
+	var sample := ASCENT.sample_at(_trajectory.samples, at)
+	var basis := _rocket.global_transform.basis
+	var velocity: Vector2 = sample.velocity + Vector2(basis.x.x, basis.x.y) * push.x + Vector2(basis.y.x, basis.y.y) * push.y
+	_debris.append({"node": node, "position": Vector2(node.global_position.x + _craft_x, node.global_position.y + _craft_y), "velocity": velocity, "spin": spin, "t": at})
+
+## Advances each piece from its own clock to the current simulated time.
+func _update_debris(sim_time: float) -> void:
+	for piece in _debris:
+		var remaining: float = sim_time - piece.t
+		piece.t = sim_time
+		var node: Node3D = piece.node
+		node.rotation.z += piece.spin * remaining
+		while remaining > 0.0:
+			var step := minf(remaining, 0.5)
+			var position: Vector2 = piece.position
+			piece.velocity -= position * ASCENT.MU / pow(position.length(), 3.0) * step
+			piece.position = position + piece.velocity * step
+			remaining -= step
+
+func _clear_debris() -> void:
+	for piece in _debris:
+		piece.node.visible = false
+	_debris.clear()
+
+func _clock(seconds: float) -> String:
+	var whole := int(seconds)
+	return "%02d:%02d" % [whole / 60, whole % 60]
 
 func skip_ascent() -> void:
 	if not ignited or failed or not can_skip or finished: return
-	advance_ascent(ASCENT_SECONDS - elapsed)
+	advance_ascent(ascent_duration - elapsed)
 
 func _explode() -> void:
 	_status.text = "LAUNCH FAILURE"
@@ -397,13 +539,15 @@ func _finish_success() -> void:
 		initial.eccentricity = (42164.0 - 6621.0) / (42164.0 + 6621.0)
 	else:
 		initial.semi_major_axis_km = FlightSim.R_EARTH_KM + float(mission.targetAltitudeKm)
-	initial.arg_periapsis_rad = INSERTION_ANGLE
+	var final_position: Vector2 = _trajectory.final.position
+	initial.arg_periapsis_rad = atan2(final_position.x, final_position.y)
 	GameManager.initial_orbit = initial
+	var start_radius := initial.semi_major_axis_km * (1.0 - initial.eccentricity) * 1000.0
+	place_craft(start_radius * sin(initial.arg_periapsis_rad), start_radius * cos(initial.arg_periapsis_rad))
 	_station.visible = false
 	if _upper_flame: _upper_flame.visible = false
-	if _payload:
-		for player: AnimationPlayer in _payload.find_children("*", "AnimationPlayer", true, false):
-			if player.has_animation("deploy"): player.play("deploy")
+	_clear_debris()
+	_update_camera()
 	_handoff_to_flight()
 
 func _handoff_to_flight() -> void:
@@ -412,23 +556,57 @@ func _handoff_to_flight() -> void:
 	_flight = load("res://scenes/FlightView.tscn").instantiate()
 	_flight.set("shared_launch", self)
 	add_child(_flight)
-	_flight.activate_shared_world(_launch_view, _root3d, _rocket, _camera, previous_camera, _camera_yaw, _camera_pitch, _camera_distance * rocket_height)
+	_flight.activate_shared_world(_launch_view, _anchor, _rocket, _camera, previous_camera, _camera_yaw, _camera_pitch, _camera_distance * rocket_height)
 	for child in get_children():
 		if child != _flight: child.visible = false
 	_launch_view.visible = true
 	_flight.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
+## at is the simulated flight time; it defaults to now.
 func _log(message: String, at: float = -1.0) -> void:
-	var seconds := int(elapsed if at < 0 else at)
-	GameManager.last_result.flight_log.append("T+%02d:%02d %s" % [seconds / 60, seconds % 60, message])
+	GameManager.last_result.flight_log.append("T+%s %s" % [_clock(_sim_time if at < 0 else at), message])
 
 func focus_point() -> Vector3:
 	return _rocket.transform * Vector3(0, focus_height, 0)
 
+## Moves the craft to a position in metres from Earth's centre (launch site on +Y). The subtraction
+## happens in double precision before anything is converted to a single-precision Vector3.
+func place_craft(x: float, y: float) -> void:
+	_craft_x = x
+	_craft_y = y
+	_rocket.position = Vector3.ZERO
+	_anchor.position = Vector3(-x, EARTH_RADIUS_M - y, 0.0)
+	for piece in _debris:
+		piece.node.position = Vector3(piece.position.x - x, piece.position.y - y, 0.0)
+
+## The craft's position in the anchor's frame (launch site at the origin, Earth's centre below).
+func craft_world_position() -> Vector3:
+	return Vector3(_craft_x, _craft_y - EARTH_RADIUS_M, 0.0)
+
+## The local horizon frame at the rocket: Y away from Earth's centre, X downrange.
+func local_frame() -> Basis:
+	return Basis(Vector3.BACK, -atan2(_craft_x, _craft_y))
+
+## Camera position relative to the focus point, orbiting in the local horizon frame so Earth
+## stays below the rocket as it travels around the planet.
+func camera_offset(distance: float, yaw: float, pitch: float) -> Vector3:
+	return local_frame() * (Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * distance)
+
+## A close spacecraft view once the payload has separated, otherwise the whole rocket.
+func spacecraft_view_distance() -> float:
+	return _payload_view_distance if payload_separated() else rocket_height * 1.9
+
+func payload_separated() -> bool:
+	return _events_done.has("payload_separation") and _payload != null
+
+## Size of what is flying: the separated spacecraft, or the whole rocket.
+func spacecraft_size() -> float:
+	return _payload_view_distance / 6.0 if payload_separated() else rocket_height
+
 func _update_camera() -> void:
 	var target := focus_point()
-	_camera.position = target + Vector3(sin(_camera_yaw)*cos(_camera_pitch), sin(_camera_pitch), cos(_camera_yaw)*cos(_camera_pitch)) * rocket_height * _camera_distance
-	_camera.look_at(target,Vector3.UP)
+	_camera.position = target + camera_offset(rocket_height * _camera_distance, _camera_yaw, _camera_pitch)
+	_camera.look_at(target, local_frame().y)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE: ignite()

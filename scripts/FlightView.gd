@@ -329,7 +329,7 @@ func _update_position() -> void:
 	_marker.position = Vector3(position_km.x, 0.0, position_km.y) * FlightSim.RENDER_SCALE
 	if is_instance_valid(_shared_rocket):
 		_marker.position = Vector3(position_km.y * 1000.0, position_km.x * 1000.0 - 6371000.0, 0)
-		_shared_rocket.position = _marker.position
+		shared_launch.place_craft(position_km.y * 1000.0, position_km.x * 1000.0)
 	var radius := float(position_km.length())
 	altitude_km = radius - FlightSim.R_EARTH_KM
 	speed_kms = FlightSim.speed_at_radius_kms(radius, orbit.semi_major_axis_km, orbit.mu)
@@ -364,7 +364,7 @@ func toggle_map_view() -> void:
 func set_camera_preset(value: String) -> void:
 	if orbit == null: return
 	_camera_mode = value
-	_distance = (shared_launch.rocket_height * 1.9 if is_instance_valid(shared_launch) else 0.18) if value == "Spacecraft" else (190.0 * SHARED_SCALE if is_instance_valid(shared_launch) else 190.0)
+	_distance = (shared_launch.spacecraft_view_distance() if is_instance_valid(shared_launch) else 0.18) if value == "Spacecraft" else (190.0 * SHARED_SCALE if is_instance_valid(shared_launch) else 190.0)
 	if value == "Wide":
 		_distance = maxf(190.0, orbit.semi_major_axis_km * (1.0 + orbit.eccentricity) * FlightSim.RENDER_SCALE * 3.2)
 	_update_camera()
@@ -375,7 +375,11 @@ func _update_camera() -> void:
 		_camera.far = 100000000.0 if _map_view else 2000000.0
 	var target := _marker.position if _camera_mode == "Spacecraft" else Vector3.ZERO
 	if is_instance_valid(_shared_rocket):
-		target = shared_launch.focus_point() if _camera_mode == "Spacecraft" else _shared_center
+		target = shared_launch.focus_point() if _camera_mode == "Spacecraft" else _marker.get_parent().to_global(_shared_center)
+		if _camera_mode == "Spacecraft":
+			_camera.position = target + shared_launch.camera_offset(_distance, _yaw, _pitch)
+			_camera.look_at(target, shared_launch.local_frame().y)
+			return
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
 

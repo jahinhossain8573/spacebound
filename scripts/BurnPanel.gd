@@ -114,12 +114,13 @@ func _on_execute() -> void:
 	if execute_burn(amount, retrograde):
 		var flame := MeshInstance3D.new()
 		var mesh := CylinderMesh.new()
-		var scale_factor: float = flight.shared_launch.rocket_height if shared else 0.03
-		mesh.top_radius = scale_factor * 0.015
+		var scale_factor: float = flight.shared_launch.spacecraft_size() if shared else 0.03
+		var spacecraft: bool = shared and flight.shared_launch.payload_separated()
+		mesh.top_radius = scale_factor * (0.15 if spacecraft else 0.015)
 		mesh.bottom_radius = 0.0
-		mesh.height = scale_factor * 0.15
+		mesh.height = scale_factor * (1.0 if spacecraft else 0.15)
 		flame.mesh = mesh
-		flame.position.y = scale_factor * (0.42 if shared else -0.15)
+		flame.position.y = flight.shared_launch.focus_height - scale_factor if spacecraft else scale_factor * (0.42 if shared else -0.15)
 		var material := StandardMaterial3D.new()
 		material.albedo_color = Color("ffb300")
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
