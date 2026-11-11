@@ -436,7 +436,6 @@ func set_camera_preset(value: String) -> void:
 func _update_camera() -> void:
 	if is_instance_valid(_shared_rocket):
 		_camera.near = 1000.0 if _map_view else 0.5
-		_camera.far = 100000000.0 if _map_view else 2000000.0
 	var target := _marker.position if _camera_mode == "Spacecraft" else Vector3.ZERO
 	if is_instance_valid(_shared_rocket):
 		target = shared_launch.focus_point() if _camera_mode == "Spacecraft" else _marker.get_parent().to_global(_shared_center)
@@ -450,7 +449,7 @@ func _update_camera() -> void:
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
 	if is_instance_valid(shared_launch):
-		shared_launch.update_world_visibility()
+		shared_launch.update_world_visibility(100000000.0 if _map_view else 2000000.0)
 	elif is_instance_valid(_earth):
 		_earth.update_horizon(_camera)
 

@@ -50,6 +50,15 @@ static func kennedy_basis() -> Basis:
 		-cos(KENNEDY_LATITUDE) * sin(KENNEDY_LONGITUDE))
 	return Basis(east, up, east.cross(up)).transposed()
 
+func visible_distance_from(camera_position: Vector3) -> float:
+	var radius := global_basis.x.length()
+	var inner_radius_squared := pow(radius * OCCLUDER_RADIUS, 2.0)
+	var camera_distance_squared := camera_position.distance_squared_to(global_position)
+	# A ray grazing the inner sphere can reach the far side of the outer shell.
+	var distance_to_tangent := sqrt(maxf(0.0, camera_distance_squared - inner_radius_squared))
+	var distance_through_shell := sqrt(maxf(0.0, radius * radius - inner_radius_squared))
+	return (distance_to_tangent + distance_through_shell) * 1.01
+
 func update_horizon(camera: Camera3D) -> void:
 	var inverse_basis := global_basis.inverse()
 	var to_camera := inverse_basis * (camera.global_position - global_position)

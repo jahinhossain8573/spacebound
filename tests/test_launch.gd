@@ -137,6 +137,13 @@ func run_tests() -> void:
 	check(shared._map_view and patches.any(func(patch: MeshInstance3D) -> bool: return patch.visible) and patches.any(func(patch: MeshInstance3D) -> bool: return not patch.visible), "shared-world map keeps near Earth patches and culls the far side")
 	shared.toggle_map_view()
 	check(not shared._map_view, "shared-world third person restored")
+	for altitude_km in [1656.0, 9168.0]:
+		var high_orbit := OrbitState.new()
+		high_orbit.semi_major_axis_km = PHYSICS.R_EARTH / 1000.0 + altitude_km
+		shared.set_orbit(high_orbit)
+		var center_distance: float = camera.global_position.distance_to(launch._earth.global_position)
+		var limb_distance := sqrt(center_distance * center_distance - PHYSICS.R_EARTH * PHYSICS.R_EARTH)
+		check(camera.far > limb_distance and camera.near <= 0.5, "ship camera covers Earth's limb at %.0f km altitude" % altitude_km)
 	launch.queue_free()
 	await process_frame
 	check(manager.load_campaign() == OK and manager.has_launched_once, "first launch flag persisted")

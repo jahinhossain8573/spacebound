@@ -915,21 +915,20 @@ func _update_camera() -> void:
 	if _map_view:
 		var center := _earth_spin.global_position + _map_pan
 		_camera.near = 1000.0
-		_camera.far = 200000000.0
 		_camera.position = center + Vector3(sin(_map_yaw) * cos(_map_pitch), sin(_map_pitch), cos(_map_yaw) * cos(_map_pitch)) * _map_distance
 		_camera.look_at(center, Vector3.UP)
-		update_world_visibility()
+		update_world_visibility(200000000.0)
 		return
-	_camera.far = 2000000.0
 	var target := focus_point()
 	_camera.position = target + camera_offset(rocket_height * _camera_distance, _camera_yaw, _camera_pitch)
 	_camera.look_at(target, local_frame().y)
 	_camera.near = clampf(_camera.position.distance_to(target) * 0.15, 0.5, 8.0)
 	update_world_visibility()
 
-func update_world_visibility() -> void:
+func update_world_visibility(minimum_far := 2000000.0) -> void:
 	var pad_distance := _camera.global_position.distance_to(_station.global_position)
 	_earth.set_local_detail(SPACE_CENTER.update_visibility(_station, _pad_rig, pad_distance))
+	_camera.far = maxf(minimum_far, _earth.visible_distance_from(_camera.global_position))
 	_earth.update_horizon(_camera)
 
 func _unhandled_key_input(event: InputEvent) -> void:
