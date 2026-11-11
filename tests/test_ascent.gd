@@ -1,6 +1,7 @@
 extends SceneTree
 
 const ASCENT = preload("res://scripts/AscentSim.gd")
+const LIVE_ASCENT = preload("res://scripts/LiveAscent.gd")
 
 var failures := 0
 
@@ -52,5 +53,37 @@ func run_tests() -> void:
 			check(ordered, "%s events in flight order" % label)
 			check(altitude_at(result, events.max_q) > 5.0 and altitude_at(result, events.max_q) < 20.0, "%s max-Q in the lower atmosphere" % label)
 			check(altitude_at(result, events.meco) > 40.0 and altitude_at(result, events.meco) < 130.0, "%s MECO at a realistic altitude" % label)
+	check_autopilot_recovery(data)
 	print("Ascent failures: ", failures)
 	quit(1 if failures else 0)
+
+func check_autopilot_recovery(data: Node) -> void:
+	for mission_number in [1, 4]:
+		var mission: Dictionary = data.get_mission(mission_number)
+		var launcher: Dictionary = data.get_launcher(mission.requiredLauncher)
+		var payload := 50.0 if mission_number == 1 else 500.0
+		var flight := LIVE_ASCENT.new(launcher.ascent, payload, mission)
+		while flight.elapsed < 29.0:
+			flight.advance(ASCENT.STEP, -1.0, 0.0)
+		flight.scripted = true
+		while flight.elapsed < 4000.0 and not flight.deployed and flight.failure.is_empty():
+			flight.advance(flight.step_size(), 0.0, 0.0)
+		check(flight.deployed and flight.target_reached(), "%s autopilot recovers an early pitch-over and reaches the target orbit" % launcher.name)
+
+	var mission: Dictionary = data.get_mission(1)
+	var launcher: Dictionary = data.get_launcher(mission.requiredLauncher)
+	var flight := LIVE_ASCENT.new(launcher.ascent, 50.0, mission)
+	# Recreate a low, nearly level Electron at the reported point in flight.
+	flight.clamped = false
+	flight.elapsed = 74.0
+	flight.py += 5282.0
+	flight.vx += 744.0
+	flight.pitch = deg_to_rad(-6.0)
+	flight.fuel -= (flight.elapsed - ASCENT.CLAMP_HOLD_TIME) * ASCENT.propellant_flow(flight.stages[0])
+	flight._update_conditions()
+	flight.scripted = true
+	var initial_fuel := flight.fuel
+	while flight.elapsed < 120.0 and flight.failure.is_empty():
+		flight.advance(ASCENT.STEP, 0.0, 0.0)
+	check(flight.failure.is_empty() and flight.radial_speed > 150.0 and flight.altitude > 5282.0
+		and flight.fuel < initial_fuel, "autopilot pulls out of the low dive using the remaining booster fuel")

@@ -4,6 +4,7 @@ const PHYSICS = preload("res://scripts/AscentSim.gd")
 const MAX_FLIGHT_S := 20000.0
 const ATMOSPHERE_M := 130000.0
 const CIRCULAR_TOLERANCE_M := 25000.0
+const RECOVERY_CEILING_M := 105000.0
 
 var stages: Array
 var target: Dictionary
@@ -51,6 +52,7 @@ var _passed_max_q := false
 var _coast_to_burn := false
 var _circularizing := false
 var _recovery := false
+var _booster_recovery := false
 
 func _init(ascent: Dictionary, payload_kg: float, mission: Dictionary) -> void:
 	stages = ascent.stages
@@ -69,6 +71,9 @@ func _init(ascent: Dictionary, payload_kg: float, mission: Dictionary) -> void:
 func advance(dt: float, turn: float, throttle_rate: float) -> void:
 	if deployed or not failure.is_empty():
 		return
+	_booster_recovery = stage == 0 and (scripted or hold) and altitude < RECOVERY_CEILING_M and (
+		_booster_recovery or _needs_booster_recovery()
+	)
 	if scripted:
 		_script_controls()
 		if deployed:
@@ -224,9 +229,18 @@ func target_reached(precise := false) -> bool:
 
 func target_pitch() -> float:
 	if stage == 0:
-		return PHYSICS.booster_pitch(altitude, airspeed, air_path, _kick)
+		var gravity_turn := PHYSICS.booster_pitch(altitude, airspeed, air_path, _kick)
+		if _booster_recovery or _needs_booster_recovery():
+			# Rebuild a climb before turning downrange again. Following air-relative
+			# prograde here would preserve the shallow or descending trajectory.
+			var recovery_pitch := deg_to_rad(42.0 + 43.0 * exp(-altitude / 17000.0))
+			recovery_pitch *= 1.0 - smoothstep(65000.0, RECOVERY_CEILING_M, altitude)
+			return maxf(gravity_turn, maxf(recovery_pitch, _climb_pitch_floor()))
+		return gravity_turn
 	if scripted and coast.energy >= 0.0:
 		return wrapf(orbit_path + PI, -PI, PI)
+	if (scripted or hold) and altitude < 75000.0 and radial_speed < 0.0 and not safe_orbit():
+		return _climb_pitch_floor()
 	if scripted and _recovery:
 		return 0.0 if horizontal_speed >= 0.0 else PI
 	if safe_orbit() and _overshot_target():
@@ -242,6 +256,28 @@ func target_pitch() -> float:
 		PHYSICS.ambient_thrust(engine, altitude) / mass, mass,
 		PHYSICS.propellant_flow(engine), float(engine.ispVacuumS), target
 	)
+
+func _needs_booster_recovery() -> bool:
+	return not clamped and altitude >= PHYSICS.VERTICAL_CLEAR_ALTITUDE and (
+		(altitude < 30000.0 and air_path < deg_to_rad(42.0))
+		or (altitude < 75000.0 and radial_speed < 0.0)
+	)
+
+func _climb_pitch_floor() -> float:
+	# Following a shallow or descending velocity vector in dense air keeps the rocket diving.
+	# Restore climb rate while leaving the nominal gravity turn in control when it is climbing.
+	var atmosphere_weight := 1.0 - smoothstep(45000.0, RECOVERY_CEILING_M, altitude)
+	var climb_speed := minf(400.0, 100.0 + altitude * 0.007) * atmosphere_weight
+	var deficit := climb_speed - radial_speed
+	if deficit <= 0.0 or atmosphere_weight <= 0.0:
+		return -PI * 0.5
+	var radius := PHYSICS.R_EARTH + altitude
+	var effective_gravity := PHYSICS.MU / (radius * radius) - horizontal_speed * horizontal_speed / radius
+	var drag := PHYSICS.drag_acceleration(pressure, mach, _area, mass, airspeed)
+	var needed := effective_gravity + drag * radial_speed + deficit / 8.0
+	var full_thrust_accel := PHYSICS.ambient_thrust(stages[stage], altitude) / mass
+	var climb_pitch := asin(clampf(needed / full_thrust_accel, 0.0, 1.0))
+	return climb_pitch * smoothstep(0.0, 85.0, deficit) * atmosphere_weight
 
 func circularization_dv() -> float:
 	if not is_finite(coast.apoapsis):
@@ -333,6 +369,8 @@ func guidance() -> String:
 			return "Booster cutoff. Use the staging panel to separate."
 		if altitude < PHYSICS.VERTICAL_CLEAR_ALTITUDE or airspeed < PHYSICS.VERTICAL_RISE_SPEED:
 			return "Climb vertically to clear the tower."
+		if _booster_recovery or _needs_booster_recovery():
+			return "Climbing to recover the ascent. Follow the pitch marker."
 		if not _passed_max_q:
 			return "Pitch toward downrange and follow the target marker through Max-Q."
 		return "Past Max-Q. Follow the gravity turn until booster cutoff."
