@@ -25,6 +25,9 @@ func setup(length_m: float, nozzle_width: float, upper_stage: bool) -> void:
 
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# The flame texture is grayscale. Add its light so overlapping billboards
+	# cannot darken the plume's hot core when viewed along the exhaust.
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	material.billboard_keep_scale = true
