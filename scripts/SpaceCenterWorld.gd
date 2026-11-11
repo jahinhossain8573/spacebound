@@ -3,8 +3,14 @@ extends RefCounted
 ## Kennedy Space Center scenery, pad effects and dynamic launch atmosphere.
 
 const KENNEDY := preload("res://assets/3d-models/launch_area/kennedy_launch_area.glb")
+const EARTH_VISUAL := preload("res://scripts/EarthVisual.gd")
 const STATION_RANGE_M := 14000.0
 const PAD_DETAIL_RANGE_M := 3500.0
+const STRUCTURE_RANGE_M := 7000.0
+const PLANE_BLEND_BEGIN_M := 6000.0
+const PLANE_BLEND_END_M := 8500.0
+const GROUND_BLEND_BEGIN_M := 3500.0
+const GROUND_BLEND_END_M := 11500.0
 
 const SKY_ZENITH_DAY := Color("5079a6")
 const SKY_HORIZON_DAY := Color("cbd6db")
@@ -65,7 +71,17 @@ static func populate_space_center(station: Node3D, rocket_height: float, rocket_
 		var mesh := node as MeshInstance3D
 		var size := mesh.get_aabb().size
 		# Small structures drop out before the barrier island and the water.
-		mesh.visibility_range_end = clampf(size.length() * 25.0, 3500.0, STATION_RANGE_M)
+		mesh.visibility_range_end = clampf(size.length() * 25.0, 3500.0, STRUCTURE_RANGE_M)
+	var ground := MeshInstance3D.new()
+	ground.name = "KennedyGround"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(12288.0, 12288.0)
+	ground.mesh = plane
+	ground.position.y = EARTH_VISUAL.GROUND_HEIGHT_M
+	var ground_material := EARTH_VISUAL.make_surface(true)
+	ground.material_override = ground_material
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	station.add_child(ground)
 	var rig := Node3D.new()
 	rig.name = "PadEffects"
 	station.add_child(rig)
@@ -133,7 +149,17 @@ static func populate_space_center(station: Node3D, rocket_height: float, rocket_
 	smoke.color_ramp = grad
 	rig.add_child(smoke)
 
-	return {"root": rig, "clamps": clamps, "pad_smoke": smoke}
+	return {"root": rig, "clamps": clamps, "pad_smoke": smoke, "ground": ground, "ground_material": ground_material}
+
+static func update_visibility(station: Node3D, pad: Dictionary, distance_m: float) -> float:
+	station.visible = distance_m < STATION_RANGE_M
+	pad.root.visible = distance_m < PAD_DETAIL_RANGE_M
+	pad.ground.visible = distance_m < PLANE_BLEND_END_M
+	pad.ground_material.set_shader_parameter("plane_weight",
+		1.0 - smoothstep(PLANE_BLEND_BEGIN_M, PLANE_BLEND_END_M, distance_m))
+	var detail := 1.0 - smoothstep(GROUND_BLEND_BEGIN_M, GROUND_BLEND_END_M, distance_m)
+	pad.ground_material.set_shader_parameter("local_detail", detail)
+	return detail
 
 static func _box(parent: Node3D, size: Vector3, pos: Vector3, material: Material) -> MeshInstance3D:
 	var item := MeshInstance3D.new()

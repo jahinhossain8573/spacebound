@@ -815,13 +815,12 @@ func _update_camera() -> void:
 	var target := focus_point()
 	_camera.position = target + camera_offset(rocket_height * _camera_distance, _camera_yaw, _camera_pitch)
 	_camera.look_at(target, local_frame().y)
-
+	_camera.near = clampf(_camera.position.distance_to(target) * 0.15, 0.5, 8.0)
 	update_world_visibility()
 
 func update_world_visibility() -> void:
 	var pad_distance := _camera.global_position.distance_to(_station.global_position)
-	_station.visible = pad_distance < SPACE_CENTER.STATION_RANGE_M
-	_pad_rig.root.visible = pad_distance < SPACE_CENTER.PAD_DETAIL_RANGE_M
+	_earth.set_local_detail(SPACE_CENTER.update_visibility(_station, _pad_rig, pad_distance))
 	_earth.update_horizon(_camera)
 
 func _unhandled_key_input(event: InputEvent) -> void:

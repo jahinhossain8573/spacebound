@@ -22,6 +22,19 @@ func run_tests() -> void:
 	var patches: Array[MeshInstance3D] = launch._earth._patches
 	check(patches.size() == 20 and patches.any(func(patch: MeshInstance3D) -> bool: return not patch.visible), "pad camera culls far-side Earth patches")
 	var pad_camera: Transform3D = launch._camera.global_transform
+	var ground_material: ShaderMaterial = launch._pad_rig.ground_material
+	check(is_equal_approx(float(ground_material.get_shader_parameter("local_detail")), 1.0), "pad shows full local ground detail")
+	launch._camera.position = Vector3(0.0, 7000.0, 0.0)
+	launch.update_world_visibility()
+	var detail := float(ground_material.get_shader_parameter("local_detail"))
+	var globe_material: ShaderMaterial = patches[0].material_override
+	check(launch._pad_rig.ground.visible and detail > 0.0 and detail < 1.0
+		and is_equal_approx(detail, float(globe_material.get_shader_parameter("local_detail"))),
+		"ground and globe share the same detail blend")
+	launch._camera.position = Vector3(0.0, 9400.0, 0.0)
+	launch.update_world_visibility()
+	check(not launch._pad_rig.ground.visible and float(globe_material.get_shader_parameter("local_detail")) > 0.0,
+		"local texture stays on the globe after the ground mesh disappears")
 	launch._camera.position = Vector3(0.0, 20000.0, 0.0)
 	launch.update_world_visibility()
 	check(not launch._station.visible, "camera distance hides Kennedy scenery")
