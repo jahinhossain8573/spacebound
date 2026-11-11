@@ -1,6 +1,9 @@
 extends Control
 
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
+const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
+const UI = preload("res://scripts/UIStyle.gd")
+const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
 var mission: Dictionary = {}
@@ -15,6 +18,8 @@ var _plotter
 var _marker: MeshInstance3D
 var _camera: Camera3D
 var _view: SubViewportContainer
+var _flight_hud: Control
+var _warp_buttons: Dictionary = {}
 var _hud: Label
 var _error: Label
 var _yaw := 0.55
@@ -71,6 +76,7 @@ func _ready() -> void:
 	_build_scene()
 	if mission.get("targetOrbit", "") not in ["LEO", "SSO", "GEO", "GTO"]:
 		_error.text = "This mission needs its own lunar flight scene. Use Back to return."
+		_flight_hud.sync_banners()
 		return
 	if GameManager.initial_orbit != null:
 		set_orbit(GameManager.initial_orbit)
@@ -83,14 +89,18 @@ func _ready() -> void:
 				initial.eccentricity = (42164.0 - 6621.0) / (42164.0 + 6621.0)
 			_:
 				_error.text = "This mission needs its own lunar flight scene. Use Back to return."
+				_flight_hud.sync_banners()
 				return
 		set_orbit(initial)
 	_initialize_power()
 	_update_mission_objectives()
+	_update_objectives()
 	_burn_panel = load("res://scenes/ui/BurnPanel.tscn").instantiate()
-	_view.get_parent().add_child(_burn_panel)
-	_view.get_parent().move_child(_burn_panel, _view.get_index())
+	_flight_hud.burn_drawer.add_child(_burn_panel)
 	_burn_panel.setup(self)
+	if _burn_panel.engine.is_empty() and float(mission.get("requiredDeltaVMps", 0.0)) <= 0.0:
+		_flight_hud.burn_drawer.visible = false
+	_flight_hud.set_stage_cards([{"index": 0, "icon": "comms", "label": "ORBIT OPS", "active": true}])
 	EventManager.register_flight(self)
 	if power_active:
 		EventManager.roll_trigger("arrival")
@@ -106,49 +116,12 @@ func _ready() -> void:
 		tween.tween_callback(fade.queue_free)
 
 func _build_scene() -> void:
-	var layout := VBoxContainer.new()
-	layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(layout)
-	var buttons := HBoxContainer.new()
-	layout.add_child(buttons)
-	_add_button(buttons, "< Back", func(): get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn"))
-	for level in WARP_LEVELS:
-		_add_button(buttons, "%dx" % level, set_warp.bind(level))
-	_map_button = Button.new()
-	_map_button.text = "Map view (M)"
-	_map_button.pressed.connect(toggle_map_view)
-	buttons.add_child(_map_button)
-	_add_button(buttons, "Reset view", _reset_view)
-	_hud = Label.new()
-	_hud.add_theme_color_override("font_color", Color("279af1"))
-	layout.add_child(_hud)
-	_objective_label = Label.new()
-	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	layout.add_child(_objective_label)
-	_images_label = Label.new()
-	_images_label.visible = false
-	layout.add_child(_images_label)
-	_beacon_label = Label.new()
-	_beacon_label.add_theme_color_override("font_color", Color("279af1"))
-	layout.add_child(_beacon_label)
-	_battery_label = Label.new()
-	layout.add_child(_battery_label)
-	_battery_bar = ProgressBar.new()
-	_battery_bar.custom_minimum_size.y = 22
-	layout.add_child(_battery_bar)
-	_skip_button = Button.new()
-	_skip_button.text = "Skip mission time"
-	_skip_button.pressed.connect(skip_mission_time)
-	layout.add_child(_skip_button)
-	_error = Label.new()
-	_error.add_theme_color_override("font_color", Color("ff8811"))
-	layout.add_child(_error)
 	_view = SubViewportContainer.new()
+	_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_view.stretch = true
-	_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_view.focus_mode = Control.FOCUS_ALL
 	_view.gui_input.connect(_view_input)
-	layout.add_child(_view)
+	add_child(_view)
 	var viewport := SubViewport.new()
 	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -158,10 +131,11 @@ func _build_scene() -> void:
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()
 	environment.environment.background_mode = Environment.BG_COLOR
-	environment.environment.background_color = Color("0b0e14")
+	environment.environment.background_color = Color("060910")
 	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.environment.ambient_light_color = Color("1a2640")
-	environment.environment.ambient_light_energy = 0.5
+	environment.environment.ambient_light_color = Color("2f4160")
+	environment.environment.ambient_light_energy = 0.62
+	MODEL_LIBRARY.use_sky_reflections(environment.environment)
 	world.add_child(environment)
 	var earth := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -170,8 +144,8 @@ func _build_scene() -> void:
 	sphere.rings = 32
 	earth.mesh = sphere
 	var blue := StandardMaterial3D.new()
-	blue.albedo_color = Color("2462b3")
-	blue.roughness = 0.8
+	blue.albedo_color = Color("1f5ca8")
+	blue.roughness = 0.72
 	earth.material_override = blue
 	world.add_child(earth)
 	var sun := DirectionalLight3D.new()
@@ -216,11 +190,35 @@ func _build_scene() -> void:
 	_camera.far = 10000.0
 	world.add_child(_camera)
 
-func _add_button(parent: Node, text: String, action: Callable) -> void:
-	var button := Button.new()
-	button.text = text
-	button.pressed.connect(action)
-	parent.add_child(button)
+	_flight_hud = FLIGHT_HUD.new()
+	_flight_hud.setup("orbit")
+	add_child(_flight_hud)
+
+	_flight_hud.back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn"))
+	_flight_hud.reset_cam_button.pressed.connect(_reset_view)
+	for level in WARP_LEVELS:
+		var wb := Button.new()
+		wb.text = "%dx" % level
+		wb.add_theme_font_size_override("font_size", 13)
+		UI.style_button(wb, "green" if level == 1 else "slate", 8, 3, 3)
+		wb.pressed.connect(set_warp.bind(level))
+		_flight_hud.warp_box.add_child(wb)
+		_warp_buttons[level] = wb
+	_map_button = _flight_hud.map_button
+	_map_button.pressed.connect(toggle_map_view)
+	_hud = _flight_hud.status_label
+	_objective_label = _flight_hud.objective_label
+	_images_label = _flight_hud.images_label
+	_beacon_label = _flight_hud.beacon_label
+	_battery_label = _flight_hud.battery_label
+	_battery_bar = _flight_hud.battery_bar
+	_skip_button = _flight_hud.skip_mission_button
+	_skip_button.pressed.connect(skip_mission_time)
+	_error = _flight_hud.error_label
+
+func _refresh_warp_buttons() -> void:
+	for level in _warp_buttons:
+		UI.style_button(_warp_buttons[level], "green" if level == warp else "slate", 8, 3, 3)
 
 func set_orbit(value: OrbitState) -> bool:
 	if value == null or not value.is_valid():
@@ -228,6 +226,7 @@ func set_orbit(value: OrbitState) -> bool:
 		_marker.visible = false
 		_plotter.redraw(null)
 		_error.text = "Invalid orbit: use a finite, bound ellipse with positive radius and gravitational parameter."
+		_flight_hud.sync_banners()
 		return false
 	var period: float = FlightSim.orbital_period_s(value.semi_major_axis_km, value.mu)
 	if not is_finite(period) or period <= 0.0:
@@ -235,6 +234,7 @@ func set_orbit(value: OrbitState) -> bool:
 		orbit = null
 		_marker.visible = false
 		_plotter.redraw(null)
+		_flight_hud.sync_banners()
 		return false
 	var initial_orbit := orbit == null
 	orbit = value.copy()
@@ -249,7 +249,9 @@ func set_orbit(value: OrbitState) -> bool:
 
 func set_warp(value: int) -> void:
 	if EventManager.blocking: return
-	if value in WARP_LEVELS: warp = value
+	if value in WARP_LEVELS:
+		warp = value
+		_refresh_warp_buttons()
 
 func _mission_end_s() -> float:
 	return float(mission.durationDays) * 86400.0 + (_observation_start_s if mission.get("durationStartsAtOrbit", false) else 0.0)
@@ -264,6 +266,7 @@ func advance_time(real_delta_s: float) -> void:
 			elapsed = until
 			_wait_target = -1.0
 			warp = 1
+			_refresh_warp_buttons()
 	if power_active:
 		var remaining := minf(elapsed, maxf(0.0, _mission_end_s() - mission_elapsed_s))
 		var period_s: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
@@ -337,7 +340,11 @@ func _update_position() -> void:
 	var periapsis := orbit.semi_major_axis_km * (1.0 - orbit.eccentricity) - FlightSim.R_EARTH_KM
 	var apoapsis := orbit.semi_major_axis_km * (1.0 + orbit.eccentricity) - FlightSim.R_EARTH_KM
 	var name: String = "Sun-synchronous, 98° inclination (planar simulation)" if mission.get("targetOrbit", "") == "SSO" else str(mission.get("title", "Orbit preview"))
-	_hud.text = "%s\nElapsed %.1f s  |  Altitude %.1f km  |  Speed %.3f km/s\nPeriapsis %.1f km  |  Apoapsis %.1f km  |  Period %.1f s  |  %dx  |  %s" % [name, mission_elapsed_s, altitude_km, speed_kms, periapsis, apoapsis, FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu), warp, "ECLIPSE" if in_eclipse else "SUNLIGHT"]
+	_hud.text = "%s  |  Pe %.0f km · Ap %.0f km · T %.0f s  |  %dx" % [name, periapsis, apoapsis, FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu), warp]
+	_flight_hud.sun_badge.text = "ECLIPSE" if in_eclipse else "SUNLIGHT"
+	_flight_hud.sun_badge.add_theme_color_override("font_color", UI.KSP_AMBER if in_eclipse else UI.KSP_GREEN_TEXT)
+	var bat_frac := (battery_charge_wh / battery_capacity_wh) if battery_capacity_wh > 0.0 else 1.0
+	_flight_hud.update_telemetry(altitude_km * 1000.0, speed_kms * 1000.0, "Orbit", 0.0, rad_to_deg(atan2(position_km.y, position_km.x)) + 90.0, 0.0, bat_frac, 0.0, mission_elapsed_s, false)
 
 func is_in_eclipse(pos_km: Vector2) -> bool:
 	return pos_km.x < 0.0 and absf(pos_km.y) < FlightSim.R_EARTH_KM
@@ -358,7 +365,8 @@ func toggle_map_view() -> void:
 		_camera_mode = "Earth"
 	_map_view = not _map_view
 	_plotter.visible = _map_view
-	_map_button.text = "Flight view (M)" if _map_view else "Map view (M)"
+	_map_button.text = "Ship" if _map_view else "Map"
+	_map_button.tooltip_text = "Flight view (M)" if _map_view else "Map view (M)"
 	_update_camera()
 
 func set_camera_preset(value: String) -> void:
@@ -475,6 +483,7 @@ func _power_failure(message: String) -> void:
 	if power_failed or mission_finished: return
 	power_failed = true
 	_error.text = message
+	_flight_hud.sync_banners()
 	_failure_delay = 3.0
 	_set_objective("Survive mission duration", false)
 	GameManager.last_result.flight_log.append("T+%.1fs %s" % [mission_elapsed_s, message])
@@ -511,6 +520,7 @@ func activate_shared_world(view: SubViewportContainer, world: Node3D, rocket: No
 	view.reparent(parent)
 	parent.move_child(view, index)
 	old_view.queue_free()
+	_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_camera = camera
 	_shared_rocket = rocket
 	_yaw = yaw
@@ -544,6 +554,7 @@ func _award_beacon(at: float) -> void:
 			if objective.get("id", "") == definition.id and not objective.done:
 				objective.done = true
 				_beacon_label.text = definition.message
+				_flight_hud.sync_banners()
 				GameManager.last_result.flight_log.append("T+%.1fs %s" % [at, definition.message])
 
 func _update_objectives() -> void:
@@ -551,13 +562,14 @@ func _update_objectives() -> void:
 	var lines: Array[String] = []
 	for objective in GameManager.last_result.get("objectives", []):
 		lines.append(("[DONE] " if objective.get("done", false) else "[PENDING] ") + str(objective.get("name", "")))
-	_objective_label.text = "  |  ".join(lines)
+	_objective_label.text = "\n".join(lines)
 
 func wait_for_apsis(apoapsis: bool) -> void:
 	if orbit == null or orbit.eccentricity < 0.001 or power_failed or mission_finished or not _skip_result.is_empty(): return
 	var period: float = FlightSim.orbital_period_s(orbit.semi_major_axis_km, orbit.mu)
 	_wait_target = period * 0.5 if apoapsis else 0.0
 	warp = 1000
+	_refresh_warp_buttons()
 
 func _exit_tree() -> void:
 	EventManager.unregister_flight(self)
@@ -573,6 +585,7 @@ func _update_mission_objectives() -> void:
 					var achieved: bool = MISSION_OBJECTIVES.circularize(orbit, float(definition.targetRadiusKm))
 					if achieved and not objective.done:
 						_beacon_label.text = "Geostationary orbit achieved"
+						_flight_hud.sync_banners()
 						GameManager.last_result.flight_log.append("T+%.1fs Geostationary orbit achieved" % mission_elapsed_s)
 					objective.done = achieved
 				"powered_part":
