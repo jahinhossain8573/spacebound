@@ -65,7 +65,7 @@ static func update_atmosphere(env_data: Dictionary, altitude_m: float) -> void:
 	env.ambient_light_color = Color("b7c6d6").lerp(Color("455878"), curved)
 	env.ambient_light_energy = lerpf(0.72, 0.42, curved)
 
-static func populate_space_center(station: Node3D, rocket_height: float, rocket_radius: float) -> Dictionary:
+static func add_scenery(station: Node3D) -> MeshInstance3D:
 	var area := KENNEDY.instantiate() as Node3D
 	station.add_child(area)
 	var origin := area.find_child("launch_origin", true, false) as Node3D
@@ -81,10 +81,13 @@ static func populate_space_center(station: Node3D, rocket_height: float, rocket_
 	plane.size = Vector2(12288.0, 12288.0)
 	ground.mesh = plane
 	ground.position.y = EARTH_VISUAL.GROUND_HEIGHT_M
-	var ground_material := EARTH_VISUAL.make_surface(true)
-	ground.material_override = ground_material
+	ground.material_override = EARTH_VISUAL.make_surface(true)
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	station.add_child(ground)
+	return ground
+
+static func populate_space_center(station: Node3D, rocket_height: float, rocket_radius: float) -> Dictionary:
+	var ground := add_scenery(station)
 	var rig := Node3D.new()
 	rig.name = "PadEffects"
 	station.add_child(rig)
@@ -117,7 +120,7 @@ static func populate_space_center(station: Node3D, rocket_height: float, rocket_
 		_pad_cloud(rig, Vector3(-0.89, 0.14, 0.45), pad_scale, DENSE_SMOKE, true)
 	]
 	return {"root": rig, "clamps": clamps, "pad_smoke": exhaust,
-		"ground": ground, "ground_material": ground_material}
+		"ground": ground, "ground_material": ground.material_override}
 
 static func set_pad_exhaust(pad: Dictionary, firing: bool) -> void:
 	for cloud: CPUParticles3D in pad.pad_smoke:

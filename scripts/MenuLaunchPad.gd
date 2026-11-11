@@ -1,7 +1,7 @@
 extends Node3D
 
 const FALCON_9 := preload("res://assets/3d-models/rockets/falcon9/launcher_falcon_9.glb")
-const KENNEDY := preload("res://assets/3d-models/launch_area/kennedy_launch_area.glb")
+const SPACE_CENTER := preload("res://scripts/SpaceCenterWorld.gd")
 const STEAM := preload("res://assets/vfx/kenney/smoke_08.png")
 const MIST := preload("res://assets/vfx/kenney/smoke_07.png")
 const VERTICAL_FOV := 70.0
@@ -14,16 +14,12 @@ var _main_vent: CPUParticles3D
 
 func _ready() -> void:
 	_create_environment()
-	var pad := KENNEDY.instantiate() as Node3D
-	pad.rotation_degrees.y = 45.0
-	add_child(pad)
-	var ground := PlaneMesh.new()
-	ground.size = Vector2(2400.0, 2400.0)
-	ground.material = preload("res://scripts/SpaceCenterWorld.gd").mat(Color("202731"))
-	var ground_mesh := MeshInstance3D.new()
-	ground_mesh.mesh = ground
-	ground_mesh.position.y = -8.35
-	add_child(ground_mesh)
+	var station := Node3D.new()
+	station.rotation_degrees.y = 45.0
+	add_child(station)
+	var ground := SPACE_CENTER.add_scenery(station)
+	var ground_material := ground.material_override as ShaderMaterial
+	ground_material.set_shader_parameter("local_detail", 1.0)
 	var rocket := FALCON_9.instantiate() as Node3D
 	rocket.rotation_degrees.y = -40.0
 	add_child(rocket)
@@ -115,7 +111,7 @@ func _add_beacon(origin: Vector3, texture: Texture2D) -> void:
 	_glow(origin, texture, Color("ff9a77"), 0.32)
 
 func _add_floodlight_bank(origin: Vector3, texture: Texture2D) -> void:
-	var steel := preload("res://scripts/SpaceCenterWorld.gd").mat(Color("353d49"))
+	var steel := SPACE_CENTER.mat(Color("353d49"))
 	var mast := MeshInstance3D.new()
 	var support := BoxMesh.new()
 	support.size = Vector3(0.28, origin.y, 0.28)
