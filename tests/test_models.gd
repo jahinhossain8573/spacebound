@@ -28,6 +28,7 @@ func run_tests() -> void:
 	check(MODEL_LIBRARY.instantiate("parts", "no_such_part") == null, "missing model falls back to null")
 	check_fixture(data)
 	check_rule_violations(data)
+	check_vega_c(data)
 	check_delivered_models(data)
 	print("Model failures: ", failures)
 	quit(1 if failures else 0)
@@ -72,6 +73,18 @@ func check_rule_violations(data: Node) -> void:
 	check(has_error(result, "below the origin"), "part centred on its origin rejected")
 	check(has_error(result, "no 'deploy' animation"), "deployable part without animation rejected")
 	part.free()
+
+func check_vega_c(data: Node) -> void:
+	var model := MODEL_LIBRARY.instantiate("launchers", "launcher_vega_c")
+	check(model != null, "Vega-C loads through the launcher model library")
+	if model == null:
+		return
+	var result := MODEL_CHECKS.check("launchers", model, data.get_launcher("launcher_vega_c"))
+	check(result.errors.is_empty(), "Vega-C meets the launcher spec (%d triangles, %s m) %s" % [result.triangles, result.size, result.errors])
+	check(absf(result.size.y - 35.0) < 0.01, "Vega-C matches the launch camera's 35 m scale")
+	for section in ["stage_1", "interstage", "stage_2", "fairing_left", "fairing_right"]:
+		check(model.has_node(section), "Vega-C exposes %s to the staging system" % section)
+	model.free()
 
 func check_delivered_models(data: Node) -> void:
 	var total_bytes := 0

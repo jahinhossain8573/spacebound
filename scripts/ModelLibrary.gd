@@ -3,6 +3,8 @@ extends RefCounted
 const CATEGORIES := ["launchers", "buses", "parts", "environment", "vehicles"]
 
 static func path_for(category: String, id: String) -> String:
+	if category == "launchers" and id == "launcher_vega_c":
+		return "res://assets/3d-models/rockets/vega-c/launcher_vega_c.glb"
 	return "res://assets/models/%s/%s.glb" % [category, id]
 
 static func has_model(category: String, id: String) -> bool:
