@@ -6,6 +6,9 @@ const GROUND_TEXTURE := preload("res://assets/3d-models/launch_area/kennedy_grou
 const PAD_TEXTURE := preload("res://assets/3d-models/launch_area/kennedy_pad_detail.png")
 const FLORIDA_TEXTURE := preload("res://assets/3d-models/earth/florida_coast.jpg")
 const EARTH_TEXTURE := preload("res://assets/3d-models/earth/earth_spacebound-blue-marble-graded.png")
+# The masks use the same UVs as the color maps, with the Florida crop supplying finer coastline detail.
+const EARTH_WATER := preload("res://assets/3d-models/earth/earth_water_mask.png")
+const FLORIDA_WATER := preload("res://assets/3d-models/earth/florida_water_mask.png")
 const GROUND_HEIGHT_M := -8.2
 const GROUND_RADIUS_M := preload("res://scripts/AscentSim.gd").R_EARTH + GROUND_HEIGHT_M
 const KENNEDY_LATITUDE := deg_to_rad(28.6084)
@@ -14,15 +17,16 @@ const KENNEDY_LONGITUDE := deg_to_rad(-80.6043)
 const OCCLUDER_RADIUS := 0.9996
 const OUTER_RADIUS := 1.0
 
+var _globe: Node3D
 var _surface: ShaderMaterial
 var _patches: Array[MeshInstance3D] = []
 var _bounds: Array[AABB] = []
 
 func _ready() -> void:
-	var globe := MODEL.instantiate() as Node3D
-	add_child(globe)
+	_globe = MODEL.instantiate() as Node3D
+	add_child(_globe)
 	_surface = make_surface(false)
-	for node in globe.find_children("*", "MeshInstance3D", true, false):
+	for node in _globe.find_children("*", "MeshInstance3D", true, false):
 		var patch := node as MeshInstance3D
 		patch.material_override = _surface
 		_patches.append(patch)
@@ -46,6 +50,39 @@ func set_local_detail(detail: float) -> void:
 
 func set_ocean_detail(detail: float) -> void:
 	_surface.set_shader_parameter("ocean_detail", detail)
+
+func is_water_at(world_position: Vector3) -> bool:
+	var radial := to_local(world_position).normalized()
+	var longitude := atan2(-radial.z, radial.x)
+	var latitude := asin(clampf(radial.y, -1.0, 1.0))
+	var florida_uv := (Vector2(rad_to_deg(longitude), rad_to_deg(latitude)) - Vector2(-83.5, 31.5)) / Vector2(6.0, -5.5)
+	var mask := EARTH_WATER
+	var uv := Vector2(fposmod(longitude / TAU + 0.5, 1.0), 0.5 - latitude / PI)
+	if Rect2(0.0, 0.0, 1.0, 1.0).has_point(florida_uv):
+		mask = FLORIDA_WATER
+		uv = florida_uv
+	var image := mask.get_image()
+	var pixel := Vector2i(uv * Vector2(image.get_size())).clamp(Vector2i.ZERO, image.get_size() - Vector2i.ONE)
+	return image.get_pixelv(pixel).r >= 0.5
+
+func make_impact_surface(frame: Basis) -> MeshInstance3D:
+	# The globe's large triangles can intersect a camera at sea level.
+	# Use the same geographic textures on a finer local surface during the impact.
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(150000.0, 150000.0)
+	plane.subdivide_width = 110
+	plane.subdivide_depth = 110
+	var material := make_surface(false)
+	material.set_shader_parameter("impact_surface", true)
+	material.set_shader_parameter("impact_to_globe", global_basis.orthonormalized().inverse() * frame)
+	var surface := MeshInstance3D.new()
+	surface.mesh = plane
+	surface.material_override = material
+	surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return surface
+
+func show_globe(show: bool) -> void:
+	_globe.visible = show
 
 static func kennedy_basis() -> Basis:
 	var east := Vector3(-sin(KENNEDY_LONGITUDE), 0.0, -cos(KENNEDY_LONGITUDE))

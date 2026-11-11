@@ -56,6 +56,7 @@ var _upper_flame: LAUNCH_PLUME
 var _payload: Node3D
 var _camera: Camera3D
 var _failure_effect: LAUNCH_BREAKUP
+var _impact_surface: MeshInstance3D
 var _status: Label
 var _skip: Button
 var _start: Button
@@ -734,18 +735,28 @@ func _explode(reason := "") -> void:
 	var grounded := _ascent.altitude < rocket_height * 0.5
 	var frame := local_frame()
 	var center := _rocket.transform * (Vector3.UP * (rocket_height * 0.42))
+	var water_impact := false
 	if grounded:
 		center = _rocket.position + frame.y * (rocket_height * 0.23 + maxf(0.0, -_ascent.altitude))
 		_camera_pitch = maxf(0.12, _camera_pitch)
+		if not _ascent.clamped and _ascent.altitude == 0.0 and _ascent.radial_speed < 0.0:
+			water_impact = _earth.is_water_at(_rocket.global_position)
+	if water_impact:
+		center = _rocket.position + frame.y * (rocket_height * 0.32 + 0.45)
+		_camera_pitch = maxf(0.31, _camera_pitch)
+		_impact_surface = _earth.make_impact_surface(frame)
+		_impact_surface.transform = Transform3D(frame, _rocket.position)
+		_root3d.add_child(_impact_surface)
 	var motion := frame.inverse() * Vector3(_ascent.vx, _ascent.vy, 0.0)
 	motion.x -= _ground_speed
 	_failure_effect = LAUNCH_BREAKUP.new()
 	_failure_effect.transform = Transform3D(frame, center)
 	_root3d.add_child(_failure_effect)
-	_failure_effect.setup(rocket_height, _ascent.altitude, motion.limit_length(rocket_height * 0.62), grounded)
+	_failure_effect.setup(rocket_height, _ascent.altitude, motion.limit_length(rocket_height * 0.62), grounded, water_impact)
 	if _map_view:
 		toggle_map_view()
-	create_tween().tween_property(self, "_camera_distance", clampf(_camera_distance, 2.4, 3.6), 0.45).set_ease(Tween.EASE_OUT)
+	var failure_distance := clampf(_camera_distance, 3.8, 4.8) if water_impact else clampf(_camera_distance, 2.4, 3.6)
+	create_tween().tween_property(self, "_camera_distance", failure_distance, 0.45).set_ease(Tween.EASE_OUT)
 	_stage1_flame.update_thrust(0.0, _ascent.altitude)
 	if _upper_flame:
 		_upper_flame.update_thrust(0.0, _ascent.altitude)
@@ -927,6 +938,11 @@ func _update_camera() -> void:
 func update_world_visibility(minimum_far := 2000000.0) -> void:
 	var pad_distance := _camera.global_position.distance_to(_station.global_position)
 	_earth.set_local_detail(SPACE_CENTER.update_visibility(_station, _pad_rig, pad_distance))
+	if _impact_surface:
+		_impact_surface.visible = not _map_view
+		_earth.show_globe(_map_view)
+		if not _map_view:
+			_station.hide()
 	_camera.far = maxf(minimum_far, _earth.visible_distance_from(_camera.global_position))
 	_earth.update_horizon(_camera)
 

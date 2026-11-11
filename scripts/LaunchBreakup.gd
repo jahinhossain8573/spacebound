@@ -1,6 +1,7 @@
 extends Node3D
 
 const DURATION := 3.0
+const SPLASH := preload("res://scripts/LaunchSplash.gd")
 const CLOUD_SHADER := preload("res://assets/vfx/launch_breakup.gdshader")
 const CLOUD_MASKS := [
 	preload("res://assets/vfx/kenney/smoke_08.png"),
@@ -18,9 +19,10 @@ var _streaks := ImmediateMesh.new()
 var _streak_material := StandardMaterial3D.new()
 var _flash: OmniLight3D
 var _flash_sprite: MeshInstance3D
+var _splash: SPLASH
 var _rng := RandomNumberGenerator.new()
 
-func setup(height: float, altitude_m: float, flight_drift: Vector3, on_ground: bool) -> void:
+func setup(height: float, altitude_m: float, flight_drift: Vector3, on_ground: bool, water: bool = false) -> void:
 	_height = height
 	_grounded = on_ground
 	_air = lerpf(1.0, 0.10, smoothstep(13000.0, 85000.0, altitude_m))
@@ -87,10 +89,17 @@ func setup(height: float, altitude_m: float, flight_drift: Vector3, on_ground: b
 	flare.billboard_keep_scale = true
 	flare.render_priority = 1
 	_flash_sprite = _mesh(quad, flare)
+	if water:
+		_splash = SPLASH.new()
+		_splash.position.y = -height * 0.32
+		add_child(_splash)
+		_splash.setup(height)
 	advance(0.035)
 
 func advance(delta: float) -> void:
 	_age += delta
+	if _splash:
+		_splash.show_at(_age)
 	_flash.light_energy = 12.0 * exp(-_age * 10.0)
 	_flash_sprite.visible = _age < 0.24
 	if _flash_sprite.visible:

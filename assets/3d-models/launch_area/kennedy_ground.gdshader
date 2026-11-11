@@ -10,12 +10,19 @@ uniform float local_detail = 0.0;
 uniform bool launch_plane = false;
 uniform float plane_weight = 1.0;
 uniform float ocean_detail = 0.0;
+uniform bool impact_surface = false;
+uniform mat3 impact_to_globe;
 
 varying vec3 globe_point;
 varying vec2 plane_position;
 
 void vertex() {
-	if (launch_plane) {
+	if (impact_surface) {
+		plane_position = VERTEX.xz;
+		VERTEX.y = -dot(VERTEX.xz, VERTEX.xz) / (2.0 * ground_radius);
+		NORMAL = normalize(vec3(VERTEX.x, ground_radius, VERTEX.z));
+		globe_point = impact_to_globe * NORMAL;
+	} else if (launch_plane) {
 		plane_position = VERTEX.xz;
 		vec3 radial = vec3(VERTEX.x, ground_radius, VERTEX.z);
 		globe_point = transpose(globe_to_kennedy) * normalize(radial);
@@ -43,7 +50,7 @@ void fragment() {
 	vec3 radial = normalize(globe_point);
 	vec2 lon_lat = vec2(atan(-radial.z, radial.x), asin(clamp(radial.y, -1.0, 1.0)));
 	vec2 globe_uv = vec2(lon_lat.x / TAU + 0.5, 0.5 - lon_lat.y / PI);
-	vec3 base = texture(globe_surface, launch_plane ? globe_uv : UV).rgb;
+	vec3 base = texture(globe_surface, (launch_plane || impact_surface) ? globe_uv : UV).rgb;
 
 	// The Florida crop is georeferenced in the same longitude/latitude system as the globe.
 	vec2 florida_uv = (degrees(lon_lat) - vec2(-83.5, 31.5)) / vec2(6.0, -5.5);
@@ -72,6 +79,11 @@ void fragment() {
 		float crest = smoothstep(0.45, 1.35, waves);
 		float detail = ocean_detail * (1.0 - smoothstep(0.2, 0.7, length(fwidth(p))));
 		base = mix(base, base * (0.94 + crest * 0.21) + vec3(0.009, 0.014, 0.018) * crest, detail);
+	}
+	if (impact_surface && base.b > base.g + 0.02 && base.g > base.r + 0.02) {
+		float ripples = sin(dot(plane_position, vec2(0.19, 0.11)) + TIME * 1.8 + sin(plane_position.y * 0.065));
+		float detail = 1.0 - smoothstep(0.3, 2.0, length(fwidth(plane_position)));
+		base *= 1.0 + ripples * detail * 0.085;
 	}
 	ALBEDO = base;
 	ROUGHNESS = 0.85;

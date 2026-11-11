@@ -6,6 +6,7 @@ uniform float age;
 uniform float rotation;
 uniform float air;
 uniform float heat_duration;
+uniform bool water = false;
 
 void vertex() {
 	vec2 scale = vec2(length(MODELVIEW_MATRIX[0].xyz), length(MODELVIEW_MATRIX[1].xyz));
@@ -23,13 +24,18 @@ void fragment() {
 	float body = smoothstep(0.03, 0.47, density * (0.73 + 0.58 * folds)) * edge;
 	float lit = texture(cloud_texture, uv + vec2(0.075, -0.065)).a;
 	float relief = clamp(0.48 + 1.3 * (density - lit) + folds * 0.23, 0.0, 1.0);
-	float heat = 1.0 - smoothstep(heat_duration * 0.30, heat_duration, age);
-	vec3 smoke = mix(vec3(0.16, 0.155, 0.16), vec3(0.76, 0.73, 0.69), relief);
-	smoke = mix(smoke, vec3(0.94, 0.66, 0.43), heat * 0.42);
-	vec3 fire = mix(vec3(0.93, 0.24, 0.045), vec3(1.0, 0.95, 0.66),
-		smoothstep(0.34, 0.75, density * 0.62 + folds * 0.44 + heat * 0.19));
-	float hot_core = heat * smoothstep(0.045, 0.44, density * (0.90 + 0.53 * folds));
-	ALBEDO = mix(smoke, fire, hot_core);
-	float fade = smoothstep(0.0, 0.10, age) * (1.0 - smoothstep(2.05, 3.0, age));
-	ALPHA = body * fade * max(heat, air) * 0.91;
+	if (water) {
+		ALBEDO = mix(vec3(0.45, 0.68, 0.77), vec3(0.99, 0.99, 0.97), smoothstep(0.08, 0.65, relief));
+		ALPHA = body * smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.68, 2.55, age));
+	} else {
+		float heat = 1.0 - smoothstep(heat_duration * 0.30, heat_duration, age);
+		vec3 smoke = mix(vec3(0.16, 0.155, 0.16), vec3(0.76, 0.73, 0.69), relief);
+		smoke = mix(smoke, vec3(0.94, 0.66, 0.43), heat * 0.42);
+		vec3 fire = mix(vec3(0.93, 0.24, 0.045), vec3(1.0, 0.95, 0.66),
+			smoothstep(0.34, 0.75, density * 0.62 + folds * 0.44 + heat * 0.19));
+		float hot_core = heat * smoothstep(0.045, 0.44, density * (0.90 + 0.53 * folds));
+		ALBEDO = mix(smoke, fire, hot_core);
+		float fade = smoothstep(0.0, 0.10, age) * (1.0 - smoothstep(2.05, 3.0, age));
+		ALPHA = body * fade * max(heat, air) * 0.91;
+	}
 }
