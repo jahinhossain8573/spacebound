@@ -114,6 +114,13 @@ func execute_burn(amount: float, retrograde: bool) -> bool:
 	refresh()
 	return true
 
+func has_planned_burn() -> bool:
+	return _value.value > 0.0 and not _busy and not engine.is_empty()
+
+func start_planned_burn() -> void:
+	if not _execute.disabled:
+		_on_execute()
+
 func _on_execute() -> void:
 	if _busy: return
 	_busy = true
@@ -122,13 +129,14 @@ func _on_execute() -> void:
 	refresh()
 	var model: Node3D = flight._shared_rocket if is_instance_valid(flight._shared_rocket) else flight._craft_visual
 	var orbit: OrbitState = flight.orbit
-	var before: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s, orbit.mu).rotated(orbit.arg_periapsis_rad)
-	var after: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s + 0.1, orbit.mu).rotated(orbit.arg_periapsis_rad)
-	var direction := (after - before).normalized() * (-1.0 if retrograde else 1.0)
+	var before: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s, orbit.mu)
+	var after: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s + 0.1, orbit.mu)
+	var direction := ((after - before) * Vector2(1.0, orbit.direction)).rotated(orbit.arg_periapsis_rad).normalized()
+	if retrograde: direction = -direction
 	var shared := is_instance_valid(flight._shared_rocket)
 	var tween := create_tween()
 	if shared: tween.tween_property(model, "rotation:z", atan2(-direction.y, direction.x), 1.0)
-	else: tween.tween_property(model, "rotation:y", atan2(direction.y, direction.x), 1.0)
+	else: tween.tween_property(model, "rotation:y", atan2(-direction.y, direction.x), 1.0)
 	await tween.finished
 	_busy = false
 	if execute_burn(amount, retrograde):

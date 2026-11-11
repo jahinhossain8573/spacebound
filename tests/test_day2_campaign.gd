@@ -43,9 +43,9 @@ func run_tests() -> void:
 		root.add_child(launch)
 		launch.set_process(false)
 		launch.rng.seed = 1
-		launch.ignite()
+		launch.toggle_scripted_flight()
 		check(not launch.failed, "Seeded Mission %d launch succeeds" % number)
-		launch.advance_ascent(launch.ascent_duration)
+		launch.advance_ascent(20001.0)
 		var flight = launch._flight
 		flight.set_process(false)
 		while events.blocking:

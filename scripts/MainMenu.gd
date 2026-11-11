@@ -1,5 +1,6 @@
 extends "res://scripts/CampaignScreen.gd"
 
+const FLIGHT_PREFERENCES = preload("res://scripts/FlightPreferences.gd")
 const AnimatedMenuButton = preload("res://scripts/MainMenuButton.gd")
 
 func _ready() -> void:
@@ -48,6 +49,7 @@ func _ready() -> void:
 	_body.add_child(_retry)
 	_menu_button("New Campaign", _new_campaign)
 	_menu_button("Continue", _continue_campaign, FileAccess.file_exists(GameManager.save_path))
+	_menu_button("Settings", _settings)
 	_menu_button("Credits", _credits)
 	_menu_button("Exit", get_tree().quit)
 
@@ -59,3 +61,28 @@ func _menu_button(caption: String, action: Callable, available: bool = true) -> 
 	button.pressed.connect(action)
 	_body.add_child(button)
 	return button
+
+func _settings() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "Settings"
+	dialog.ok_button_text = "Done"
+	add_child(dialog)
+	var options := VBoxContainer.new()
+	options.custom_minimum_size.x = 300.0
+	dialog.add_child(options)
+	var guidance := CheckButton.new()
+	guidance.text = "Flight guidance"
+	guidance.button_pressed = FLIGHT_PREFERENCES.guidance_enabled()
+	options.add_child(guidance)
+	var error := Label.new()
+	error.visible = false
+	error.text = "Could not save settings."
+	options.add_child(error)
+	guidance.toggled.connect(func(enabled: bool):
+		error.visible = FLIGHT_PREFERENCES.save_guidance(enabled) != OK
+		if error.visible:
+			guidance.set_pressed_no_signal(not enabled)
+	)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()

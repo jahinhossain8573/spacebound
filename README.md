@@ -112,15 +112,13 @@ Run `godot --headless --path . --script res://tests/test_balance.gd` for full re
 
 ## Continuous launch and flight
 
-The ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the craft's position and camera framing. Right-drag and the wheel control the camera, and M switches between flight and map view.
+The ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the craft's position and camera framing. Press M to switch between flight and map view. Right-drag rotates, the wheel zooms, and middle-drag pans the map.
 
-The ascent is simulated with physics in `scripts/AscentSim.gd`: per-stage thrust that rises from sea-level to vacuum values, propellant burn-off, inverse-square gravity, exponential-atmosphere drag and the launch site's rotation (eastward launches gain speed, sun-synchronous ones lose a little). The first stage rises vertically, pitches over and flies a gravity turn. The upper stage burns into a transfer orbit with a 200 km perigee, or 250 km for GTO, then for circular targets coasts to apogee and circularizes. Stage figures are in each launcher's `ascent` block in `data/launchers.json`. Electron's upper stage carries effective values, standing in for its Kick Stage, so readiness-approved payloads reach every mission orbit.
+Ignite and advance stages from the lower-left flight panel. Use WASD to steer the nose within the flight plane, Shift/Ctrl to adjust throttle, Z for full throttle, and X for cutoff. The map shows where the craft would coast and when it will reach the next apsis. Flight guidance shows the target pitch and burn cues. The steering hold follows the target until you steer manually. Disable guidance in Main Menu → Settings.
 
-The simulated flight plays back in about 45 seconds. The powered ascent takes 30 seconds, the coast to apogee is fast-forwarded, and the final burn and payload separation play at half speed. Events follow the real sequence: Max-Q, MECO, stage separation, second-stage ignition, fairing separation above 110 km, cutoff, circularization, and payload separation. The flight log records their simulated times. Spent stages and fairing halves fall on their own ballistic trajectories. After separation, the upper stage backs away, the camera moves in to the satellite, and its deployables open. The rocket stays at the render origin while Earth moves around it (a floating origin), so close-up views do not shake.
+The live ascent reuses the planar thrust, propellant consumption, gravity, atmospheric drag, and launch-site rotation in `scripts/AscentSim.gd`. Staging drops mass and releases ballistic debris. Payload deployment hands the achieved orbit to orbital operations. For demonstrations, G toggles scripted control using the current flight state.
 
-Run `godot --headless --path . --script res://tests/test_ascent.gd` to fly every mission at a light payload and at the readiness limit (90% of capacity), checking the final orbit, event order, max-Q and MECO altitudes.
-
-`godot --headless --path . --script res://tests/test_launch.gd` checks staging, station visibility, insertion continuity, shared camera/viewport ownership, and map switching. Launch, orbit, power, and campaign checks passed. A temporary Web preview was checked from pad through orbit and back from map view; a native run reported no rendering errors.
+Run `godot --headless --path . --script res://tests/test_launch.gd` for guided manual insertion, staging, map controls, and scripted takeover. The scripted reference trajectories are covered by `tests/test_ascent.gd`.
 
 ## Mission 1
 

@@ -142,6 +142,17 @@ func simulate_mission_skip(duration_s: float, orbit_period_s: float, eclipse_fra
 	return {"survived":true, "lowest_wh":lowest, "end_wh":charge, "failed_orbit":-1, "elapsed_s":elapsed, "sunlit_pass_completed_s":pass_completed, "sunlit_passes":pass_count, "pass_started":pass_started}
 
 ## Apply a planar velocity-aligned impulse without changing the current position.
+## Velocity at a position expressed in the unrotated, forward-moving orbital frame.
+func velocity_at_orbit_position_kms(orbit: OrbitState, position: Vector2) -> Vector2:
+	var a := orbit.semi_major_axis_km
+	var e := orbit.eccentricity
+	var b_factor := sqrt(1.0 - e * e)
+	var cos_e := clampf(position.x / a + e, -1.0, 1.0)
+	var sin_e := position.y / (a * b_factor)
+	var factor := sqrt(orbit.mu / a) / (1.0 - e * cos_e)
+	return Vector2(-sin_e, b_factor * cos_e) * factor
+
+
 func predict_orbit_burn(orbit: OrbitState, dv_mps: float) -> Dictionary:
 	if orbit == null or not orbit.is_valid() or not is_finite(dv_mps): return {}
 	var a := orbit.semi_major_axis_km
@@ -149,10 +160,7 @@ func predict_orbit_burn(orbit: OrbitState, dv_mps: float) -> Dictionary:
 	var p := position_on_orbit_km(a, e, orbit.time_since_periapsis_s, orbit.mu)
 	var r := float(p.length())
 	if r <= 0.0: return {}
-	var cos_e := clampf((p.x / a) + e, -1.0, 1.0)
-	var sin_e := p.y / (a * sqrt(1.0 - e * e))
-	var factor := sqrt(orbit.mu / a) / (1.0 - e * cos_e)
-	var velocity := Vector2(-sin_e, sqrt(1.0 - e * e) * cos_e) * factor
+	var velocity := velocity_at_orbit_position_kms(orbit, p)
 	var speed := float(velocity.length())
 	if speed <= 0.0 or speed + dv_mps / 1000.0 <= 0.0: return {}
 	velocity *= (speed + dv_mps / 1000.0) / speed
@@ -167,7 +175,8 @@ func predict_orbit_burn(orbit: OrbitState, dv_mps: float) -> Dictionary:
 	result.semi_major_axis_km = -orbit.mu / (2.0 * energy)
 	result.eccentricity = new_e
 	var local_arg := eccentricity_vector.angle() if new_e > 0.0000001 else p.angle()
-	result.arg_periapsis_rad = orbit.arg_periapsis_rad + local_arg
+	result.direction = orbit.direction
+	result.arg_periapsis_rad = orbit.arg_periapsis_rad + local_arg * orbit.direction
 	var q := p.rotated(-local_arg)
 	var cos_new := clampf(q.x / result.semi_major_axis_km + new_e, -1.0, 1.0)
 	var sin_new := q.y / (result.semi_major_axis_km * sqrt(1.0 - new_e * new_e))

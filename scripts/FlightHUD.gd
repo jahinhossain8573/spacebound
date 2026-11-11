@@ -42,6 +42,14 @@ var battery_bar: ProgressBar
 var skip_mission_button: Button
 var map_button: Button
 var reset_cam_button: Button
+var stage_hint: Label
+var _stage_hint_panel: PanelContainer
+var guidance_panel: PanelContainer
+var guidance_label: Label
+var guidance_hold: Button
+var map_readout: Label
+var _map_panel: PanelContainer
+var _map_markers: Array[Label] = []
 
 func setup(hud_mode: String) -> void:
 	mode = hud_mode
@@ -334,13 +342,40 @@ func _build_top_right() -> void:
 		btn_dv.pressed.connect(func(): burn_drawer.visible = not burn_drawer.visible)
 		app_col.add_child(btn_dv)
 
-		map_button = Button.new()
-		map_button.text = "Map"
-		map_button.tooltip_text = "Map view (M)"
-		map_button.custom_minimum_size = Vector2(36, 34)
-		map_button.add_theme_font_size_override("font_size", 12)
-		UI.style_button(map_button, "blue", 4, 4, 3)
-		app_col.add_child(map_button)
+	if mode == "launch":
+		guidance_panel = PanelContainer.new()
+		guidance_panel.add_theme_stylebox_override("panel", UI.metallic_panel(Color(0.12, 0.15, 0.19, 0.92), UI.SLATE_BORDER, 6, 8))
+		drawer_stack.add_child(guidance_panel)
+		var guide := VBoxContainer.new()
+		guidance_panel.add_child(guide)
+		guidance_label = Label.new()
+		guidance_label.custom_minimum_size.x = 300.0
+		guidance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		guidance_label.add_theme_font_size_override("font_size", 14)
+		guide.add_child(guidance_label)
+		guidance_hold = Button.new()
+		guidance_hold.text = "Steering hold"
+		guidance_hold.toggle_mode = true
+		guidance_hold.tooltip_text = "Follow the target marker. WASD releases the hold."
+		UI.style_button(guidance_hold, "slate", 8, 4, 3)
+		guide.add_child(guidance_hold)
+
+	_map_panel = PanelContainer.new()
+	_map_panel.add_theme_stylebox_override("panel", UI.metallic_panel(Color(0.12, 0.15, 0.19, 0.92), UI.SLATE_BORDER, 6, 8))
+	drawer_stack.add_child(_map_panel)
+	map_readout = Label.new()
+	map_readout.add_theme_font_size_override("font_size", 14)
+	map_readout.add_theme_color_override("font_color", UI.KSP_CYAN)
+	_map_panel.add_child(map_readout)
+	_map_panel.hide()
+
+	map_button = Button.new()
+	map_button.text = "Map"
+	map_button.tooltip_text = "Map view (M)"
+	map_button.custom_minimum_size = Vector2(36, 34)
+	map_button.add_theme_font_size_override("font_size", 12)
+	UI.style_button(map_button, "blue", 4, 4, 3)
+	app_col.add_child(map_button)
 
 	reset_cam_button = Button.new()
 	reset_cam_button.text = "Cam"
@@ -382,7 +417,17 @@ func _build_bottom_left() -> void:
 
 	if mode == "launch":
 		start_button = Button.new()
-		start_button.text = "Launch now (Space)"
+		start_button.text = "Ignite main engines"
+		_stage_hint_panel = PanelContainer.new()
+		_stage_hint_panel.add_theme_stylebox_override("panel", UI.inset_well(Color("161e29"), UI.SLATE_BORDER, 5, 4))
+		col.add_child(_stage_hint_panel)
+		stage_hint = Label.new()
+		stage_hint.custom_minimum_size.x = 190.0
+		stage_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		stage_hint.add_theme_font_size_override("font_size", 13)
+		stage_hint.add_theme_color_override("font_color", UI.WHITE)
+		_stage_hint_panel.add_child(stage_hint)
+		_stage_hint_panel.hide()
 		start_button.add_theme_font_size_override("font_size", 15)
 		UI.style_button(start_button, "green", 10, 6, 4)
 		col.add_child(start_button)
@@ -506,6 +551,42 @@ func update_stage_fuel(key: String, ratio: float) -> void:
 	if _stage_card_bars.has(key) and is_instance_valid(_stage_card_bars[key]):
 		(_stage_card_bars[key] as ProgressBar).value = clampf(ratio, 0.0, 1.0)
 
+func set_stage_hint(text: String) -> void:
+	stage_hint.text = text
+	_stage_hint_panel.visible = not text.is_empty()
+
+func set_map_readout(text: String) -> void:
+	map_readout.text = text
+	_map_panel.visible = not text.is_empty()
+
+func update_map_markers(camera: Camera3D, markers: Array) -> void:
+	var occupied: Array[Rect2] = []
+	for i in markers.size():
+		if i >= _map_markers.size():
+			var label := Label.new()
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			label.add_theme_color_override("font_color", UI.KSP_CYAN)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_constant_override("outline_size", 5)
+			label.add_theme_font_size_override("font_size", 14)
+			add_child(label)
+			_map_markers.append(label)
+		var label := _map_markers[i]
+		var point: Vector3 = markers[i][0]
+		var screen := camera.unproject_position(point)
+		label.visible = not camera.is_position_behind(point) and get_rect().has_point(screen)
+		if label.visible:
+			label.text = "• " + str(markers[i][1])
+			label.reset_size()
+			var area := Rect2(screen + Vector2(5.0, -8.0), label.size)
+			for previous in occupied:
+				if area.intersects(previous):
+					area.position.y = previous.end.y + 2.0
+			label.position = area.position
+			occupied.append(area)
+	for i in range(markers.size(), _map_markers.size()):
+		_map_markers[i].hide()
+
 func update_aero_readout(twr: float, mach: float, q_pa: float, g_load: float, clamped := false) -> void:
 	if aero_label == null:
 		return
@@ -542,7 +623,7 @@ func update_telemetry(altitude_m: float, speed_mps: float, speed_mode: String, p
 	navball.speed_mps = speed_mps
 	navball.speed_mode = speed_mode
 	navball.pitch_rad = pitch_rad
-	navball.prograde_pitch_rad = pitch_rad if is_nan(flight_path_rad) else flight_path_rad
+	navball.prograde_pitch_rad = flight_path_rad if speed_mps >= 0.5 else NAN
 	navball.heading_deg = heading_deg
 	navball.throttle = throttle
 	navball.right_bar = g_or_bat
@@ -631,10 +712,27 @@ class NavballControl extends Control:
 	var speed_mps: float = 0.0
 	var speed_mode: String = "Surface"
 	var pitch_rad: float = PI * 0.5
-	var prograde_pitch_rad: float = PI * 0.5
+	var prograde_pitch_rad := NAN
+	var target_pitch_rad := NAN
+	var steering_hold_active := false
 	var heading_deg: float = 90.0
 	var throttle: float = 0.0
 	var right_bar: float = 1.0
+
+	func direction_offset(direction_pitch: float, radius: float) -> Vector2:
+		var error := angle_difference(pitch_rad, direction_pitch)
+		var height := sin(error) if absf(error) < PI * 0.5 else signf(error)
+		return Vector2(0.0, -height * radius)
+
+	func horizon_offset(x: float, radius: float) -> float:
+		var sky_side := 1.0 if cos(pitch_rad) >= 0.0 else -1.0
+		return sky_side * sin(pitch_rad) * sqrt(maxf(0.0, radius * radius - x * x))
+
+	func _draw_off_scale(center: Vector2, limit: float, offset: Vector2, color: Color, width: float) -> void:
+		var side := signf(offset.y)
+		var tip := center + Vector2(0.0, side * limit)
+		var base := tip - Vector2(0.0, side * width)
+		draw_polyline(PackedVector2Array([base - Vector2(width, 0), tip, base + Vector2(width, 0)]), color, 2.0, true)
 
 	func _draw() -> void:
 		var w := size.x
@@ -655,42 +753,58 @@ class NavballControl extends Control:
 		if right_bar > 0.005:
 			draw_arc(ball_c, ball_r + 9.0, PI * 0.32, lerpf(PI * 0.32, -PI * 0.32, clampf(right_bar, 0.0, 1.0)), 20, Color("68d43b"), 6.0, true)
 
-		# Sky and ground clipped inside ball circle using polygon slices
-		var pitch_offset := clampf((pitch_rad / (PI * 0.5)), -1.0, 1.0) * ball_r * 0.85
+		# Project the local horizon onto the visible hemisphere.
 		draw_circle(ball_c, ball_r, Color("8a5024"))
-		var sky_pts := PackedVector2Array()
-		var steps := 36
-		var y_hor := clampf(ball_c.y + pitch_offset, ball_c.y - ball_r, ball_c.y + ball_r)
-		var dy := clampf((y_hor - ball_c.y) / ball_r, -1.0, 1.0)
-		var a_span := acos(dy)
-		for i in (steps + 1):
-			var a := -PI * 0.5 - a_span + (2.0 * a_span) * float(i) / steps
-			sky_pts.append(ball_c + Vector2(cos(a), sin(a)) * ball_r)
-		if sky_pts.size() >= 3:
+		var steps := 48
+		var sky_side := -1.0 if cos(pitch_rad) >= 0.0 else 1.0
+		var vertical := absf(cos(pitch_rad)) < 0.01
+		if vertical:
+			if sin(pitch_rad) > 0.0:
+				draw_circle(ball_c, ball_r, Color("1f7ac4"))
+		else:
+			var horizon := PackedVector2Array()
+			for i in steps + 1:
+				var x := -cos(PI * float(i) / steps) * ball_r
+				horizon.append(ball_c + Vector2(x, horizon_offset(x, ball_r)))
+			var sky_pts := horizon.duplicate()
+			for i in range(1, steps):
+				var a := sky_side * PI * float(i) / steps
+				sky_pts.append(ball_c + Vector2(cos(a), sin(a)) * ball_r)
 			draw_colored_polygon(sky_pts, Color("1f7ac4"))
+			draw_polyline(horizon, Color.WHITE, 2.0, true)
 
-		# Horizon line & pitch ladder
-		var hw := sqrt(maxf(0.0, ball_r * ball_r - (y_hor - ball_c.y) * (y_hor - ball_c.y)))
-		if hw > 2.0:
-			draw_line(Vector2(ball_c.x - hw, y_hor), Vector2(ball_c.x + hw, y_hor), Color.WHITE, 2.0)
 		for deg: int in [-60, -30, 30, 60]:
-			var py: float = ball_c.y + pitch_offset - (float(deg) / 90.0) * ball_r * 0.85
-			if absf(py - ball_c.y) < ball_r - 6.0:
+			var y := direction_offset(deg_to_rad(deg), ball_r).y
+			if absf(y) < ball_r - 6.0:
 				var tick_w := 16.0 if abs(deg) == 30 else 10.0
+				var py := ball_c.y + y
 				draw_line(Vector2(ball_c.x - tick_w, py), Vector2(ball_c.x + tick_w, py), Color(1, 1, 1, 0.78), 1.4)
 		draw_line(Vector2(ball_c.x, ball_c.y - ball_r + 2), Vector2(ball_c.x, ball_c.y + ball_r - 2), Color(1, 1, 1, 0.3), 1.0)
 
-		# Prograde marker positioned relative to craft attitude (centered when flying zero-AoA!)
-		var rel_pitch := prograde_pitch_rad - pitch_rad
-		var pro_y := clampf(ball_c.y - (rel_pitch / (PI * 0.5)) * ball_r * 0.85, ball_c.y - ball_r + 12, ball_c.y + ball_r - 12)
-		var pro_c := Vector2(ball_c.x, pro_y)
-		var pro_col := Color("c8f542")
-		draw_arc(pro_c, 6.5, 0, TAU, 16, pro_col, 1.8, true)
-		draw_line(pro_c + Vector2(-6.5, 0), pro_c + Vector2(-11.5, 0), pro_col, 1.8)
-		draw_line(pro_c + Vector2(6.5, 0), pro_c + Vector2(11.5, 0), pro_col, 1.8)
-		draw_line(pro_c + Vector2(0, -6.5), pro_c + Vector2(0, -11.5), pro_col, 1.8)
+		# Off-scale directions keep their turn cue at the rim.
+		var marker_limit := ball_r - 13.0
+		if is_finite(prograde_pitch_rad):
+			var offset := direction_offset(prograde_pitch_rad, ball_r)
+			var pro_col := Color("c8f542")
+			if absf(offset.y) > marker_limit:
+				_draw_off_scale(ball_c, marker_limit, offset, pro_col, 5.0)
+			else:
+				var pro_c := ball_c + offset
+				draw_arc(pro_c, 5.0, 0, TAU, 16, pro_col, 1.8, true)
+				draw_line(pro_c + Vector2(-5, 0), pro_c + Vector2(-8, 0), pro_col, 1.8)
+				draw_line(pro_c + Vector2(5, 0), pro_c + Vector2(8, 0), pro_col, 1.8)
+				draw_line(pro_c + Vector2(0, -5), pro_c + Vector2(0, -8), pro_col, 1.8)
 
-		# Fixed KSP amber W level-flight reticle at center
+		if is_finite(target_pitch_rad):
+			var offset := direction_offset(target_pitch_rad, ball_r)
+			var target_color := Color("58e7ff")
+			if absf(offset.y) > marker_limit:
+				_draw_off_scale(ball_c, marker_limit + 6.0, offset, target_color, 9.0)
+			else:
+				var p := ball_c + offset
+				draw_polyline(PackedVector2Array([p + Vector2(0, -11), p + Vector2(11, 0), p + Vector2(0, 11), p + Vector2(-11, 0), p + Vector2(0, -11)]), target_color, 2.0, true)
+
+		# Fixed nose reticle.
 		var ret := Color("ffb01f")
 		var rw := PackedVector2Array([
 			ball_c + Vector2(-22, 0),
@@ -718,7 +832,7 @@ class NavballControl extends Control:
 			draw_rect(Rect2(w * 0.5 - 82, 26, 24, 14), Color("16212b"))
 			draw_string(font, Vector2(w * 0.5 - 82, 37), "RCS", HORIZONTAL_ALIGNMENT_CENTER, 24, 9, Color("6f7d8c"))
 			draw_rect(Rect2(w * 0.5 + 58, 26, 24, 14), Color("1f3b24"))
-			draw_string(font, Vector2(w * 0.5 + 58, 37), "SAS", HORIZONTAL_ALIGNMENT_CENTER, 24, 9, Color("8ef060"))
+			draw_string(font, Vector2(w * 0.5 + 58, 37), "SAS", HORIZONTAL_ALIGNMENT_CENTER, 24, 9, Color("8ef060") if steering_hold_active else Color("6f7d8c"))
 
 			var hdg_rect := Rect2(w * 0.5 - 34, h - 19, 68, 17)
 			draw_rect(hdg_rect, Color("10141b"))

@@ -49,25 +49,34 @@ func run_tests() -> void:
 	root.add_child(launch)
 	launch.set_process(false)
 	launch.rng.seed = 1
-	launch.ignite()
+	launch.toggle_scripted_flight()
 	check(not launch.failed, "Seeded Falcon 9 launch succeeds without debug override")
-	launch.advance_ascent(launch.ascent_duration)
+	launch.advance_ascent(20001.0)
 	var flight = launch._flight
 	flight.set_process(false)
-	check(absf(flight.orbit.semi_major_axis_km * (1-flight.orbit.eccentricity) - 6621.0) < 0.1 and absf(flight.orbit.semi_major_axis_km * (1+flight.orbit.eccentricity) - 42164.0) < 0.1, "Launch inserts exact GTO apsides")
+	check(absf(flight.orbit.semi_major_axis_km * (1-flight.orbit.eccentricity) - 6621.0) < 25.0 and absf(flight.orbit.semi_major_axis_km * (1+flight.orbit.eccentricity) - 42164.0) < 15.0, "Launch hands off the achieved GTO apsides")
 	check(gm.last_result.objectives[0].done and not gm.last_result.objectives[1].done and gm.last_result.objectives[2].done and not flight.can_skip_mission(), "GTO, transponders and skip gate tracked")
 	flight.generation_w = 1200
 	flight._update_mission_objectives()
 	check(not gm.last_result.objectives[2].done, "Underpowered transponder objective fails")
 	flight.generation_w = 1300
 	flight._update_mission_objectives()
-	flight.wait_for_apsis(true)
-	flight.advance_time(sim.orbital_period_s(flight.orbit.semi_major_axis_km))
-	check(not flight.power_failed and flight._wait_target < 0, "Wait reaches apoapsis with power")
 	var panel = flight._burn_panel
+	var fuel_before: float = panel.fuel_kg
 	var duration: float = sim.burn_duration_s(panel.dry_kg + panel.fuel_kg, 1470, panel.engine.ispSeconds, panel.engine.thrustNewtons)
 	check(duration > 2000 and duration < 2500, "Apogee burn estimated near 36 minutes")
-	check(panel.execute_burn(1470, false), "Execute apogee burn")
+	panel._value.value = 1470
+	flight.wait_for_apsis(true)
+	var g := InputEventKey.new()
+	g.keycode = KEY_G
+	g.pressed = true
+	flight._input(g)
+	check(flight._scripted_burn and panel.fuel_kg == fuel_before, "G queues the planned burn during coast")
+	flight.advance_time(sim.orbital_period_s(flight.orbit.semi_major_axis_km))
+	check(not flight.power_failed and flight._wait_target < 0, "Wait reaches apoapsis with power")
+	flight._process(0.0)
+	await create_timer(1.2).timeout
+	check(panel.fuel_kg < fuel_before and not flight._scripted_burn, "G completes the planned apogee burn once")
 	check(em.force_event("E11"), "Force E11 underperformance")
 	em._popup.choice_selected.emit("continue")
 	em._popup.closed.emit()

@@ -7,6 +7,9 @@ const ASCENT = preload("res://scripts/AscentSim.gd")
 const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
 const SPACE_CENTER = preload("res://scripts/SpaceCenterWorld.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
+const LIVE_ASCENT = preload("res://scripts/LiveAscent.gd")
+const ORBIT_PLOTTER = preload("res://scripts/OrbitPlotter.gd")
+const FLIGHT_PREFERENCES = preload("res://scripts/FlightPreferences.gd")
 const UI = preload("res://scripts/UIStyle.gd")
 
 const LAUNCH_WARP_LEVELS := [1, 2, 5, 10, 50, 250]
@@ -19,15 +22,13 @@ const EVENT_LOG := {
 	"fairing": "Fairing separation.",
 	"cutoff": "Second stage cutoff.",
 	"circularization": "Circularization burn at apogee.",
-	"circularization_cutoff": "Orbit circularized.",
+	"circularization_cutoff": "Circularization burn cutoff.",
+	"upper_restart": "Upper stage restarted.",
 	"payload_separation": "Payload separation."
 }
 
-## Total real-time simulated duration of the ascent in seconds (1:1 real physics clock).
-var ascent_duration := 40.0
 var launch_warp: int = 1
 var rng := RandomNumberGenerator.new()
-var countdown := 10.0
 var elapsed := 0.0
 var ignited := false
 var clamps_released := false
@@ -59,6 +60,7 @@ var _start: Button
 var _warning: Label
 var _save_retry: Button
 var _warp_buttons: Dictionary = {}
+var _warp_display := Vector2i.ZERO
 var _failure_timer := 0.0
 var _camera_yaw := 0.05
 var _camera_pitch := 0.34
@@ -72,8 +74,18 @@ var _station: Node3D
 var _earth_spin: Node3D
 var _earth: EARTH_VISUAL
 var _flight: Control
-var _trajectory: Dictionary
-var _segments: Array[Dictionary] = []
+var _ascent: LIVE_ASCENT
+var _step_budget := 0.0
+var _guidance_enabled := true
+var _map_view := false
+var _map_plot: MeshInstance3D
+var _map_marker: MeshInstance3D
+var _map_yaw := 0.12
+var _map_pitch := 0.18
+var _map_distance := 19000000.0
+var _map_pan := Vector3.ZERO
+var _map_refresh := 0.0
+const MAP_SCALE := 1000.0 / FlightSim.RENDER_SCALE
 var _events_done: Dictionary = {}
 var _debris: Array[Dictionary] = []
 var _sim_time := 0.0
@@ -118,32 +130,17 @@ func _ready() -> void:
 	rocket_height = {"launcher_electron":18.0, "launcher_vega_c":35.0, "launcher_falcon_9":70.0}.get(build.launcher.id, 18.0)
 	focus_height = rocket_height * 0.44
 	_upper_focus = rocket_height * 0.75
-	_simulate_ascent(build, mission)
+	_ascent = LIVE_ASCENT.new(build.launcher.ascent, float(build.stats.wet_mass_kg), mission)
+	_ground_speed = _ascent.ground_speed
+	_guidance_enabled = FLIGHT_PREFERENCES.guidance_enabled()
+	_hud_overlay.guidance_panel.visible = _guidance_enabled
 	rng.randomize()
 	_create_world()
 	_refresh_stage_hud()
-	_hud_overlay.update_telemetry(rocket_height, 0.0, "Surface", PI * 0.5, 90.0, 0.0, 1.0, 0.0, countdown, true, PI * 0.5)
+	_hud_overlay.update_telemetry(rocket_height, 0.0, "Surface", PI * 0.5, 90.0, 0.0, 1.0, 0.0, 0.0)
 	_hud_overlay.update_aero_readout(0.0, 0.0, 0.0, 1.0, true)
-	_status.text = "T-%.0f seconds  |  %s on Pad (1x Real-Time)" % [ceil(countdown), str(build.launcher.name)]
-
-## Simulates the whole flight once and lays out a true 1:1 real-time timeline (sim seconds == 1x playback seconds).
-func _simulate_ascent(build: Dictionary, mission: Dictionary) -> void:
-	var ascent: Dictionary = build.launcher.ascent
-	var target := ASCENT.target_for(mission, ascent)
-	_ground_speed = float(target.ground_speed)
-	_trajectory = ASCENT.simulate(ascent, float(build.stats.get("wet_mass_kg", 0.0)), target)
-	var total_sim_s: float = float(_trajectory.events.end)
-	_segments = [{"sim": Vector2(0.0, total_sim_s), "play": total_sim_s}]
-	ascent_duration = total_sim_s
-
-func sim_time_at(playback: float) -> float:
-	return clampf(playback, 0.0, ascent_duration)
-
-## Real-time second at which a simulated event happens, or -1 if the flight has no such event.
-func event_time(event: String) -> float:
-	if not _trajectory.events.has(event):
-		return -1.0
-	return float(_trajectory.events[event])
+	_status.text = "%s ready on the pad" % build.launcher.name
+	_refresh_flight_controls()
 
 func set_launch_warp(level: int) -> void:
 	if level not in LAUNCH_WARP_LEVELS:
@@ -153,18 +150,16 @@ func set_launch_warp(level: int) -> void:
 	_refresh_warp_buttons()
 
 func _max_safe_warp() -> int:
-	if not ignited:
-		return 10
-	var alt_m: float = sqrt(_craft_x * _craft_x + _craft_y * _craft_y) - EARTH_RADIUS_M
-	# Below 70 km atmosphere or while engines are firing, cap warp to 10x so staging & burns stay crisp;
-	# during vacuum coast to apogee, unlock 50x and 250x!
-	var coasting_vacuum: bool = alt_m > 70000.0 and _events_done.has("cutoff") and (not _trajectory.events.has("circularization") or not _firing("circularization", "circularization_cutoff"))
-	return 250 if coasting_vacuum else 10
+	return _ascent.warp_limit() if ignited else 1
 
 func _refresh_warp_buttons() -> void:
 	var max_allowed := _max_safe_warp()
 	if launch_warp > max_allowed:
 		launch_warp = max_allowed
+	var display := Vector2i(launch_warp, max_allowed)
+	if display == _warp_display:
+		return
+	_warp_display = display
 	for lvl: int in _warp_buttons:
 		var btn: Button = _warp_buttons[lvl]
 		btn.disabled = lvl > max_allowed
@@ -204,8 +199,14 @@ func _create_ui() -> void:
 		if not ignited: get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn")
 	)
 	_hud_overlay.reset_cam_button.pressed.connect(_reset_camera_view)
+	_hud_overlay.map_button.pressed.connect(toggle_map_view)
+	_hud_overlay.guidance_hold.toggled.connect(func(enabled: bool):
+		if _ascent != null:
+			_ascent.hold = enabled and _guidance_enabled and not _ascent.scripted
+			_refresh_flight_controls()
+	)
 	_start = _hud_overlay.start_button
-	_start.pressed.connect(ignite)
+	_start.pressed.connect(_next_stage)
 	_skip = _hud_overlay.skip_ascent_button
 	_skip.pressed.connect(skip_ascent)
 	_status = _hud_overlay.status_label
@@ -214,6 +215,14 @@ func _create_ui() -> void:
 	_save_retry.pressed.connect(_retry_save)
 
 func _reset_camera_view() -> void:
+	if _map_view:
+		_map_yaw = 0.12
+		_map_pitch = 0.18
+		_map_distance = maxf(19000000.0, _ascent.altitude * 2.0)
+		_map_pan = Vector3.ZERO
+		_update_camera()
+		_update_map()
+		return
 	_camera_yaw = 0.05
 	_camera_pitch = 0.34
 	_camera_distance = 2.25
@@ -315,6 +324,18 @@ func _create_world() -> void:
 	_camera.near = 0.5
 	_camera.far = 2000000.0
 	_root3d.add_child(_camera)
+	_map_plot = ORBIT_PLOTTER.new()
+	_map_plot.transform = Transform3D(Basis(Vector3.UP, Vector3.BACK, Vector3.RIGHT).scaled(Vector3.ONE * MAP_SCALE), _earth_spin.position)
+	_map_plot.hide()
+	_anchor.add_child(_map_plot)
+	_map_marker = MeshInstance3D.new()
+	var marker_mesh := SphereMesh.new()
+	marker_mesh.radius = 0.5
+	marker_mesh.height = 1.0
+	_map_marker.mesh = marker_mesh
+	_map_marker.material_override = _material(Color("58e7ff"), true)
+	_map_marker.hide()
+	_root3d.add_child(_map_marker)
 	place_craft(0.0, EARTH_RADIUS_M)
 	_update_camera()
 
@@ -427,7 +448,9 @@ func ignite() -> void:
 	if OS.is_debug_build():
 		if GameManager.debug_disable_reliability: failed = false
 		if GameManager.debug_force_launch_failure: failed = true
-	var powered_cutoff := float(_trajectory.events.get("cutoff", ascent_duration * 0.2))
+	var powered_cutoff := 0.0
+	for stage: Dictionary in _ascent.stages:
+		powered_cutoff += float(stage.propellantKg) / ASCENT.propellant_flow(stage)
 	failure_at = rng.randf_range(6.0, maxf(12.0, powered_cutoff * 0.92)) if failed else 0.0
 	GameManager.has_launched_once = true
 	if GameManager.save_campaign() != OK:
@@ -450,7 +473,6 @@ func _begin_ascent() -> void:
 	if ignited: return
 	ignited = true
 	launch_warp = 1
-	_start.disabled = true
 	_skip.visible = can_skip
 	_skip.disabled = failed
 	_hud_overlay.sun_badge.text = "IGNITION"
@@ -464,7 +486,7 @@ func _begin_ascent() -> void:
 	_log("Main engine ignition aboard %s (reliability %.0f%%)." % [GameManager.current_build.launcher.name, reliability*100], 0.0)
 	_refresh_stage_hud(1.0, 1.0)
 	_refresh_warp_buttons()
-	_apply_sample(ASCENT.sample_at(_trajectory.samples, 0.0))
+	_refresh_flight_controls()
 
 func _release_pad_clamps() -> void:
 	if clamps_released:
@@ -477,111 +499,151 @@ func _release_pad_clamps() -> void:
 				create_tween().tween_property(jaw, "rotation:z", -deg_to_rad(58.0), 0.35)
 
 func _process(delta: float) -> void:
-	if finished: return
-	if _save_retry.visible: return
-	if not ignited:
-		countdown -= delta * float(launch_warp)
-		_status.text = "T-%.0f seconds  |  %dx" % [ceil(maxf(0.0, countdown)), launch_warp]
-		_hud_overlay.update_telemetry(rocket_height, 0.0, "Surface", PI * 0.5, 90.0, 0.0, 1.0, 0.0, countdown, true, PI * 0.5)
-		if countdown <= 0.0: ignite()
+	if finished or _save_retry.visible:
 		return
-	if failed and _failure_timer > 0.0:
+	if _failure_timer > 0.0:
 		_failure_timer -= delta
-		_flash.scale = Vector3.ONE * (1.0 + (3.0-_failure_timer)*2.0)
-		if _failure_timer <= 0.0: _finish_failure()
+		_flash.scale = Vector3.ONE * (1.0 + (3.0 - _failure_timer) * 2.0)
+		if _failure_timer <= 0.0:
+			_finish_failure()
 		return
-	_refresh_warp_buttons()
-	advance_ascent(delta * float(launch_warp))
+	if ignited:
+		_refresh_warp_buttons()
+		advance_ascent(delta * float(launch_warp), true)
 
-func advance_ascent(delta: float) -> void:
-	if not ignited or finished or _failure_timer > 0.0: return
-	var next := minf(ascent_duration, elapsed + maxf(0.0, delta))
-	if failed and next >= failure_at:
-		next = failure_at
-	elapsed = next
-	_sim_time = sim_time_at(elapsed)
-	_process_milestones(_sim_time)
+func _next_stage() -> void:
+	if not ignited:
+		ignite()
+	elif not finished and _failure_timer <= 0.0 and not _ascent.scripted and _ascent.next_stage():
+		launch_warp = 1
+		_step_budget = 0.0
+		_process_milestones()
+		_refresh_flight_controls()
+
+func toggle_scripted_flight() -> void:
+	if _ascent == null or finished or _failure_timer > 0.0 or _save_retry.visible:
+		return
+	_ascent.scripted = not _ascent.scripted
+	_ascent.hold = false
+	launch_warp = 1
+	_step_budget = 0.0
+	if not ignited and _ascent.scripted:
+		ignite()
+	_refresh_flight_controls()
+
+func _steering_input() -> Vector2:
+	var x := float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A))
+	var y := float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
+	return Vector2(x, y)
+
+func _steering_turn(input: Vector2, camera_basis: Basis) -> float:
+	var tangent := Vector3(-sin(_ascent.pitch), cos(_ascent.pitch), 0.0)
+	if _map_view:
+		var frame := Basis(Vector3.BACK, -atan2(_ascent.px, _ascent.py))
+		tangent = frame * tangent
+	var screen := Vector2(tangent.dot(camera_basis.x), tangent.dot(camera_basis.y))
+	return clampf(input.dot(screen.normalized()), -1.0, 1.0)
+
+func advance_ascent(delta: float, player_frame := false) -> void:
+	if not ignited or finished or _failure_timer > 0.0:
+		return
+	var steering := Vector2.ZERO
+	var steering_basis := Basis.IDENTITY
+	var throttle_rate := 0.0
+	if player_frame and not _ascent.scripted:
+		steering = _steering_input()
+		if steering != Vector2.ZERO:
+			_ascent.hold = false
+			steering_basis = _camera.global_basis if _map_view else local_frame().inverse() * _camera.global_basis
+		throttle_rate = 0.45 * (float(Input.is_physical_key_pressed(KEY_SHIFT)) - float(Input.is_physical_key_pressed(KEY_CTRL)))
+	_step_budget += maxf(0.0, delta)
+	while not finished:
+		var step := _ascent.step_size()
+		if _step_budget + 0.000000001 < step:
+			break
+		_step_budget = maxf(0.0, _step_budget - step)
+		var turn := _steering_turn(steering, steering_basis) if steering != Vector2.ZERO else 0.0
+		_ascent.advance(step, turn, throttle_rate)
+		elapsed = _ascent.elapsed
+		_sim_time = elapsed
+		if not _ascent.events.is_empty():
+			_update_debris(_sim_time)
+			_apply_ascent_state()
+			_process_milestones()
+		if finished:
+			return
+		if not _ascent.failure.is_empty() or (failed and elapsed >= failure_at):
+			_apply_ascent_state()
+			_explode(_ascent.failure)
+			return
+		if player_frame and launch_warp > _max_safe_warp():
+			_step_budget = 0.0
+			_refresh_warp_buttons()
+			break
+
 	_update_debris(_sim_time)
-	var sample := ASCENT.sample_at(_trajectory.samples, _sim_time)
-	_apply_sample(sample)
-	if failed and elapsed >= failure_at:
-		_explode()
-		return
-
-	var px: float = float(sample.px)
-	var py: float = float(sample.py)
-	var vx: float = float(sample.vx)
-	var vy: float = float(sample.vy)
-	var r_len: float = sqrt(px * px + py * py)
-	var altitude_m: float = maxf(0.0, r_len - EARTH_RADIUS_M)
-	var altitude_km: float = altitude_m / 1000.0
-	var orbit_speed_mps: float = sqrt(vx * vx + vy * vy)
-	var air_speed_mps: float = float(sample.air_speed)
-	var use_surface := altitude_km < 36.0
-	var shown_speed := air_speed_mps if use_surface else orbit_speed_mps
-	var shown_path := float(sample.air_path) if use_surface else float(sample.orbit_path)
-	var v_radial: float = (vx * px + vy * py) / r_len
-
-	var coasting: bool = _events_done.has("cutoff") and not _events_done.has("circularization") and _trajectory.events.has("circularization")
-	var phase_note := "   [HOLD-DOWN SPOOL]" if bool(sample.clamped) else ("   COASTING TO APOGEE (Warp unlocked!)" if coasting else "")
-	_status.text = "T+%s   ALT %.1f km   %.2f km/s (%s)   STAGE %d   [%dx]%s" % [_clock(_sim_time), altitude_km, shown_speed / 1000.0, "SRF" if use_surface else "ORB", int(sample.stage) + 1, launch_warp, phase_note]
-
-	_hud_overlay.update_stage_fuel("s1", float(sample.s1_fuel_pct))
-	_hud_overlay.update_stage_fuel("s2", float(sample.s2_fuel_pct))
-	_hud_overlay.update_aero_readout(float(sample.twr), float(sample.mach), float(sample.q_pa), float(sample.g_load), bool(sample.clamped))
-	_hud_overlay.update_telemetry(
-		altitude_m + rocket_height,
-		shown_speed,
-		"Surface" if use_surface else "Orbit",
-		float(sample.pitch),
-		90.0,
-		float(sample.throttle),
-		clampf(float(sample.g_load) / 4.5, 0.08, 1.0),
-		v_radial,
-		_sim_time,
-		false,
-		shown_path
-	)
+	_apply_ascent_state()
+	_update_telemetry()
+	_refresh_flight_controls()
 	_update_camera()
-	if elapsed >= ascent_duration: _finish_success()
+	if _map_view:
+		_map_refresh -= delta / float(maxi(1, launch_warp))
+		_update_map()
 
-## Places the rocket at a simulated 64-bit state, co-rotates the pad & Earth surface so liftoff is
-## purely vertical, and animates Mach-expanding exhaust plumes and pad steam.
-func _apply_sample(sample: Dictionary) -> void:
-	var px: float = float(sample.px)
-	var py: float = float(sample.py)
-	var r_len: float = sqrt(px * px + py * py)
-	var up_x: float = px / r_len
-	var up_y: float = py / r_len
-	var p_ang: float = float(sample.pitch)
-	var axis_x: float = up_y * cos(p_ang) + up_x * sin(p_ang)
-	var axis_y: float = -up_x * cos(p_ang) + up_y * sin(p_ang)
+func _update_telemetry() -> void:
+	var surface := _ascent.altitude < 36000.0
+	var speed := _ascent.airspeed if surface else sqrt(_ascent.vx * _ascent.vx + _ascent.vy * _ascent.vy)
+	var phase := "HOLD-DOWN SPOOL" if _ascent.clamped else ("COASTING" if _ascent.applied_throttle == 0.0 else "POWERED FLIGHT")
+	_status.text = "T+%s  ·  STAGE %d  ·  %s" % [_clock(elapsed), _ascent.stage + 1, phase]
+	_hud_overlay.update_stage_fuel("s1", _ascent.fuel / float(_ascent.stages[0].propellantKg) if _ascent.stage == 0 else 0.0)
+	_hud_overlay.update_stage_fuel("s2", _ascent.fuel / float(_ascent.stages[1].propellantKg) if _ascent.stage == 1 else 1.0)
+	_hud_overlay.update_aero_readout(_ascent.thrust / (_ascent.mass * ASCENT.G0), _ascent.mach, _ascent.pressure, _ascent.g_load, _ascent.clamped)
+	_hud_overlay.navball.target_pitch_rad = _ascent.target_pitch() if _guidance_enabled else NAN
+	_hud_overlay.update_telemetry(
+		_ascent.altitude + rocket_height, speed, "Surface" if surface else "Orbit", _ascent.pitch,
+		90.0, _ascent.applied_throttle, clampf(_ascent.g_load / 4.5, 0.08, 1.0), _ascent.radial_speed,
+		elapsed, false, _ascent.air_path if surface else _ascent.orbit_path
+	)
 
-	place_craft(px, py)
-	_rocket.rotation.z = atan2(-axis_x, axis_y)
+func _refresh_flight_controls() -> void:
+	if _ascent == null or _save_retry.visible:
+		return
+	if ignited:
+		var lockout := _ascent.stage_lockout()
+		_start.text = _ascent.stage_action()
+		_start.disabled = _ascent.scripted or not lockout.is_empty()
+		_hud_overlay.set_stage_hint("Scripted guidance has control." if _ascent.scripted else lockout)
+	else:
+		_hud_overlay.set_stage_hint("WASD  Steer\nShift/Ctrl  Throttle\nZ / X  Full / Cutoff\nM  Map")
+	_hud_overlay.navball.steering_hold_active = _ascent.hold or _ascent.scripted
+	_hud_overlay.navball.queue_redraw()
+	_hud_overlay.guidance_hold.disabled = not ignited or _ascent.scripted
+	_hud_overlay.guidance_hold.set_pressed_no_signal(_ascent.hold)
+	if _guidance_enabled:
+		var cue := _ascent.guidance() if ignited else "Ignite from the staging panel, then climb vertically to clear the tower."
+		if ignited and not _ascent.clamped:
+			cue += "\nTarget pitch %+.0f°  ·  Δv remaining %.0f m/s" % [rad_to_deg(_ascent.target_pitch()), _ascent.remaining_dv()]
+		_hud_overlay.guidance_label.text = cue
 
-	var alt_m: float = maxf(0.0, r_len - EARTH_RADIUS_M)
-	SPACE_CENTER.update_atmosphere(_env_data, alt_m)
+func _apply_ascent_state() -> void:
+	place_craft(_ascent.px, _ascent.py)
+	var axis := local_frame() * Vector3(cos(_ascent.pitch), sin(_ascent.pitch), 0.0)
+	_rocket.rotation.z = atan2(-axis.x, axis.y)
+	SPACE_CENTER.update_atmosphere(_env_data, 100000.0 if _map_view else _ascent.altitude)
 
-	var s1_firing := _firing("liftoff", "meco")
-	var s2_firing := _firing("upper_ignition", "cutoff") or _firing("circularization", "circularization_cutoff")
-
-	# Pad flame-trench steam/smoke billows while Stage 1 blasts near the pad (< 140 m)
-	if _pad_rig.has("pad_smoke") and is_instance_valid(_pad_rig.pad_smoke):
-		var smoke: CPUParticles3D = _pad_rig.pad_smoke
-		var emit_smoke := s1_firing and alt_m < 140.0
-		if smoke.emitting != emit_smoke:
-			smoke.emitting = emit_smoke
-
+	var s1_firing := _ascent.stage == 0 and _ascent.applied_throttle > 0.0
+	var s2_firing := _ascent.stage == 1 and _ascent.applied_throttle > 0.0
+	if is_instance_valid(_pad_rig.get("pad_smoke")):
+		_pad_rig.pad_smoke.emitting = s1_firing and _ascent.altitude < 140.0
 	if is_instance_valid(_stage) and _stage.has_node("Flame"):
-		var fl := _stage.get_node("Flame") as Node3D
-		fl.visible = s1_firing
+		var flame := _stage.get_node("Flame") as Node3D
+		flame.visible = s1_firing
 		if s1_firing:
-			_animate_plume(fl, float(sample.throttle), alt_m)
+			_animate_plume(flame, _ascent.applied_throttle, _ascent.altitude)
 	if _upper_flame:
 		_upper_flame.visible = s2_firing
 		if s2_firing:
-			_animate_plume(_upper_flame, 1.0, alt_m)
+			_animate_plume(_upper_flame, _ascent.applied_throttle, _ascent.altitude)
 
 func _animate_plume(flame: Node3D, throttle: float, alt_m: float) -> void:
 	var vac_expand := lerpf(1.0, 2.35, clampf(alt_m / 55000.0, 0.0, 1.0))
@@ -594,44 +656,25 @@ func _animate_plume(flame: Node3D, throttle: float, alt_m: float) -> void:
 		var bh: float = float(flame.get_meta("base_height"))
 		flame.position = nl + Vector3(0.0, -bh * len_scale * 0.5, 0.0)
 
-func _firing(start: String, stop: String) -> bool:
-	var events: Dictionary = _trajectory.events
-	return ignited and events.has(start) and _sim_time >= events[start] and _sim_time < events.get(stop, INF)
-
-func _process_milestones(sim_time: float) -> void:
-	var events: Dictionary = _trajectory.events
-	var stage_changed := false
-	for event in ["clamp_release", "max_q", "meco", "stage_separation", "upper_ignition", "fairing", "cutoff", "circularization", "circularization_cutoff", "payload_separation"]:
-		if _events_done.has(event) or not events.has(event) or events[event] > sim_time:
-			continue
-		_events_done[event] = true
-		_log(EVENT_LOG[event], events[event])
-		if event in ["stage_separation", "fairing"]:
-			_apply_sample(ASCENT.sample_at(_trajectory.samples, events[event]))
-		match event:
+func _process_milestones() -> void:
+	for event in _ascent.events:
+		var id: String = event.id
+		var at: float = event.t
+		_events_done[id] = true
+		_log(EVENT_LOG[id], at)
+		match id:
 			"clamp_release":
 				_release_pad_clamps()
 			"stage_separation":
-				_separate_stage(events[event])
-				stage_changed = true
+				_separate_stage(at)
+				_refresh_stage_hud(0.0, 1.0)
 			"fairing":
-				_separate_fairings(events[event])
-				stage_changed = true
-			"cutoff":
-				_clear_debris()
-			"circularization":
-				if launch_warp > 10:
-					launch_warp = 2
-					_refresh_warp_buttons()
+				_separate_fairings(at)
+				_refresh_stage_hud(0.0, _ascent.fuel / float(_ascent.stages[1].propellantKg))
 			"payload_separation":
-				if launch_warp > 5:
-					launch_warp = 1
-					_refresh_warp_buttons()
 				_separate_payload()
-				stage_changed = true
-	if stage_changed:
-		var cur := ASCENT.sample_at(_trajectory.samples, sim_time)
-		_refresh_stage_hud(float(cur.s1_fuel_pct), float(cur.s2_fuel_pct))
+				_finish_success()
+	_ascent.events.clear()
 
 func _separate_stage(at: float) -> void:
 	stage_separated = true
@@ -664,10 +707,9 @@ func _deploy_payload() -> void:
 ## Separated hardware coasts on its own 64-bit trajectory under gravity.
 func _add_debris(node: Node3D, at: float, push: Vector2, spin: float) -> void:
 	node.reparent(_root3d, true)
-	var sample := ASCENT.sample_at(_trajectory.samples, at)
 	var basis := _rocket.global_transform.basis
-	var vx: float = float(sample.vx) + basis.x.x * push.x + basis.y.x * push.y
-	var vy: float = float(sample.vy) + basis.x.y * push.x + basis.y.y * push.y
+	var vx: float = _ascent.vx + basis.x.x * push.x + basis.y.x * push.y
+	var vy: float = _ascent.vy + basis.x.y * push.x + basis.y.y * push.y
 	_debris.append({
 		"node": node,
 		"px": float(node.global_position.x) + _craft_x,
@@ -708,17 +750,21 @@ func _clock(seconds: float) -> String:
 
 func skip_ascent() -> void:
 	if not ignited or failed or not can_skip or finished: return
-	advance_ascent(ascent_duration - elapsed)
+	_ascent.scripted = true
+	advance_ascent(LIVE_ASCENT.MAX_FLIGHT_S + 1.0)
 
-func _explode() -> void:
+func _explode(reason := "") -> void:
 	_status.text = "LAUNCH FAILURE"
+	_warning.text = reason
+	_hud_overlay.sync_banners()
+	_start.disabled = true
 	_status.add_theme_color_override("font_color", Color("ff8811"))
 	_flash.position = _rocket.position
 	_flash.visible = true
 	_rocket.visible = false
 	_skip.disabled = true
 	_failure_timer = 3.0
-	_log("Launch vehicle failure.")
+	_log("Launch vehicle failure." if reason.is_empty() else reason)
 
 func _finish_failure() -> void:
 	if finished: return
@@ -728,30 +774,33 @@ func _finish_failure() -> void:
 	get_tree().change_scene_to_file("res://scenes/Debrief.tscn")
 
 func _finish_success() -> void:
-	if finished: return
+	if finished:
+		return
+	var orbit := ASCENT.orbit_from_coast(_ascent.coast)
+	var met_target := _ascent.target_reached()
 	finished = true
-	_log("Orbital insertion nominal.")
+	_log("Orbital insertion nominal." if met_target else "Payload deployed in a safe orbit outside the mission target.")
 	GameManager.last_result.launched = true
 	for objective in GameManager.last_result.objectives:
-		if objective.get("id", "") == "reach_orbit" or objective.get("name", "") == "Reach starting orbit": objective.done = MISSION_OBJECTIVES.reach_orbit(true)
+		if objective.get("id", "") == "reach_orbit" or objective.get("name", "") == "Reach starting orbit":
+			objective.done = MISSION_OBJECTIVES.reach_orbit(met_target)
 	GameManager.flight_elapsed_s = elapsed
-	var mission: Dictionary = GameManager.current_mission
-	var initial := OrbitState.new()
-	if mission.targetOrbit in ["GEO", "GTO"]:
-		initial.semi_major_axis_km = (6621.0 + 42164.0) / 2.0
-		initial.eccentricity = (42164.0 - 6621.0) / (42164.0 + 6621.0)
-	else:
-		initial.semi_major_axis_km = FlightSim.R_EARTH_KM + float(mission.targetAltitudeKm)
-	var final_sample: Dictionary = _trajectory.final
-	initial.arg_periapsis_rad = atan2(float(final_sample.px), float(final_sample.py))
-	GameManager.initial_orbit = initial
-	var start_radius: float = initial.semi_major_axis_km * (1.0 - initial.eccentricity) * 1000.0
-	place_craft(start_radius * sin(initial.arg_periapsis_rad), start_radius * cos(initial.arg_periapsis_rad))
+	GameManager.initial_orbit = orbit
 	SPACE_CENTER.update_atmosphere(_env_data, 100000.0)
-	if _upper_flame: _upper_flame.visible = false
+	if _upper_flame:
+		_upper_flame.hide()
 	_clear_debris()
-	_update_camera()
+	var was_map := _map_view
+	if was_map:
+		toggle_map_view()
 	_handoff_to_flight()
+	if not met_target:
+		_flight._flight_hud.warning_label.text = "Safe orbit achieved outside the mission target."
+		_flight._flight_hud.sync_banners()
+	_flight._map_camera = Vector3(_map_yaw, _map_pitch, _map_distance)
+	_flight._map_pan = _map_pan
+	if was_map:
+		_flight.toggle_map_view()
 
 func _handoff_to_flight() -> void:
 	var previous_camera := _camera.global_transform
@@ -811,7 +860,67 @@ func payload_separated() -> bool:
 func spacecraft_size() -> float:
 	return _payload_view_distance / 6.0 if payload_separated() else rocket_height
 
+func toggle_map_view() -> void:
+	if _ascent == null or not is_instance_valid(_camera):
+		return
+	_map_view = not _map_view
+	_map_plot.visible = _map_view
+	_map_marker.visible = _map_view
+	SPACE_CENTER.update_atmosphere(_env_data, 100000.0 if _map_view else _ascent.altitude)
+	_hud_overlay.map_button.text = "Ship" if _map_view else "Map"
+	_map_refresh = 0.0
+	_update_camera()
+	_update_map()
+
+func _update_map() -> void:
+	if not _map_view:
+		_hud_overlay.set_map_readout("")
+		_hud_overlay.update_map_markers(_camera, [])
+		return
+	var c: Dictionary = _ascent.coast
+	if _map_refresh <= 0.0:
+		_map_plot.redraw_coast(c)
+		_map_refresh = 0.12
+	var diameter := 14.0 * _camera.position.length() * tan(deg_to_rad(_camera.fov) * 0.5) / maxf(1.0, _launch_view.size.y)
+	_map_marker.scale = Vector3.ONE * diameter
+	var pe := float(c.periapsis)
+	var ap := float(c.apoapsis)
+	var period := float(c.period)
+	var to_periapsis := fposmod(-float(c.phase), period) if period > 0.0 else INF
+	var to_apoapsis := float(c.to_apoapsis)
+	var marks: Array = [[Vector3.ZERO, "Spacecraft"]]
+	var earth_center := _earth_spin.global_position
+	var periapsis_axis := Vector3(sin(float(c.arg)), cos(float(c.arg)), 0.0)
+	if pe > EARTH_RADIUS_M:
+		marks.append([earth_center + periapsis_axis * pe, "Pe"])
+	if is_finite(ap) and ap > EARTH_RADIUS_M and (_ascent.radial_speed > 0.0 or pe > EARTH_RADIUS_M):
+		marks.append([earth_center - periapsis_axis * ap, "Ap"])
+	_hud_overlay.update_map_markers(_camera, marks)
+	var readout := "Ballistic coast prediction\n"
+	if is_finite(ap):
+		readout += "Ap %.1f km  ·  Pe %.1f km" % [(ap - EARTH_RADIUS_M) / 1000.0, (pe - EARTH_RADIUS_M) / 1000.0]
+		if pe >= EARTH_RADIUS_M:
+			if pe < EARTH_RADIUS_M + LIVE_ASCENT.ATMOSPHERE_M:
+				readout += "\nAtmosphere crossing if coasting"
+			readout += "\nNext %s in %s" % ["Ap" if to_apoapsis < to_periapsis else "Pe", LIVE_ASCENT.format_time(minf(to_apoapsis, to_periapsis))]
+		elif ignited and not _ascent.clamped:
+			readout += "\nEarth impact if coasting"
+			if _ascent.radial_speed > 0.0:
+				readout += "  ·  Ap in %s" % LIVE_ASCENT.format_time(to_apoapsis)
+	else:
+		readout += "Escape trajectory"
+	_hud_overlay.set_map_readout(readout)
+
 func _update_camera() -> void:
+	if _map_view:
+		var center := _earth_spin.global_position + _map_pan
+		_camera.near = 1000.0
+		_camera.far = 200000000.0
+		_camera.position = center + Vector3(sin(_map_yaw) * cos(_map_pitch), sin(_map_pitch), cos(_map_yaw) * cos(_map_pitch)) * _map_distance
+		_camera.look_at(center, Vector3.UP)
+		update_world_visibility()
+		return
+	_camera.far = 2000000.0
 	var target := focus_point()
 	_camera.position = target + camera_offset(rocket_height * _camera_distance, _camera_yaw, _camera_pitch)
 	_camera.look_at(target, local_frame().y)
@@ -824,11 +933,19 @@ func update_world_visibility() -> void:
 	_earth.update_horizon(_camera)
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not (event is InputEventKey and event.pressed and not event.echo):
+	if finished or _ascent == null or not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	match event.keycode:
-		KEY_SPACE:
-			ignite()
+		KEY_M: toggle_map_view()
+		KEY_G: toggle_scripted_flight()
+		KEY_Z, KEY_X:
+			if ignited and not _ascent.scripted and _failure_timer <= 0.0:
+				_ascent.set_throttle(1.0 if event.keycode == KEY_Z else 0.0)
+				_refresh_warp_buttons()
+				_process_milestones()
+				_apply_ascent_state()
+				_update_telemetry()
+				_refresh_flight_controls()
 		KEY_1: set_launch_warp(1)
 		KEY_2: set_launch_warp(2)
 		KEY_3: set_launch_warp(5)
@@ -846,14 +963,29 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _camera_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.pressed: _launch_view.grab_focus()
-		if event.button_index == MOUSE_BUTTON_RIGHT: _camera_dragging = event.pressed
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP: _camera_distance = maxf(0.35, _camera_distance * 0.9)
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN: _camera_distance = minf(8.0, _camera_distance * 1.1)
-	elif event is InputEventMouseMotion and _camera_dragging:
-		_camera_yaw -= event.relative.x * 0.01
-		_camera_pitch = clampf(_camera_pitch + event.relative.y * 0.01, -1.4, 1.4)
-	if _camera != null: _update_camera()
+		if event.pressed:
+			_launch_view.grab_focus()
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			_camera_dragging = event.pressed
+		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			var factor := 0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1
+			if _map_view:
+				_map_distance = clampf(_map_distance * factor, 7000000.0, 120000000.0)
+			else:
+				_camera_distance = clampf(_camera_distance * factor, 0.35, 8.0)
+	elif event is InputEventMouseMotion:
+		if _map_view and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
+			_map_pan += _camera.project_position(-event.relative, _map_distance) - _camera.project_position(Vector2.ZERO, _map_distance)
+		elif _camera_dragging and _map_view:
+			_map_yaw -= event.relative.x * 0.01
+			_map_pitch = clampf(_map_pitch + event.relative.y * 0.01, -1.4, 1.4)
+		elif _camera_dragging:
+			_camera_yaw -= event.relative.x * 0.01
+			_camera_pitch = clampf(_camera_pitch + event.relative.y * 0.01, -1.4, 1.4)
+	if _camera != null:
+		_update_camera()
+		if _map_view:
+			_update_map()
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _camera_dragging = false

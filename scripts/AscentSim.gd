@@ -83,6 +83,39 @@ static func pad_eci_at(ground_speed: float, t: float) -> Array[float]:
 	var angle: float = (ground_speed / R_EARTH) * t
 	return [R_EARTH * sin(angle), R_EARTH * cos(angle), angle]
 
+static func air_density(altitude_m: float) -> float:
+	return SEA_LEVEL_DENSITY * exp(-altitude_m / SCALE_HEIGHT) if altitude_m < 130000.0 else 0.0
+
+static func drag_acceleration(pressure: float, mach: float, area: float, mass: float, speed: float) -> float:
+	return pressure * mach_drag_cd(mach) * area / (mass * speed) if speed > 0.5 else 0.0
+
+static func ambient_thrust(stage: Dictionary, altitude_m: float) -> float:
+	var vacuum := float(stage.thrustVacuumN)
+	return vacuum - (vacuum - float(stage.get("thrustSeaLevelN", vacuum))) * exp(-altitude_m / SCALE_HEIGHT)
+
+static func propellant_flow(stage: Dictionary) -> float:
+	return float(stage.thrustVacuumN) / (float(stage.ispVacuumS) * G0)
+
+static func booster_pitch(altitude_m: float, airspeed_mps: float, air_path: float, kick: float) -> float:
+	if airspeed_mps < VERTICAL_RISE_SPEED or altitude_m < VERTICAL_CLEAR_ALTITUDE:
+		return PI * 0.5
+	return minf(PI * 0.5 - kick, air_path)
+
+## Velocity Verlet with the existing constant non-gravitational acceleration over the step.
+static func integrate(px: float, py: float, vx: float, vy: float, radius: float, ax: float, ay: float, dt: float) -> Array[float]:
+	var gravity := -MU / (radius * radius * radius)
+	var vx_half := vx + (px * gravity + ax) * dt * 0.5
+	var vy_half := vy + (py * gravity + ay) * dt * 0.5
+	var next_x := px + vx_half * dt
+	var next_y := py + vy_half * dt
+	var next_radius := sqrt(next_x * next_x + next_y * next_y)
+	var next_gravity := -MU / (next_radius * next_radius * next_radius)
+	return [
+		next_x, next_y,
+		vx_half + (next_x * next_gravity + ax) * dt * 0.5,
+		vy_half + (next_y * next_gravity + ay) * dt * 0.5
+	]
+
 ## Returns {samples, events, final, depleted, ground_speed}.
 static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) -> Dictionary:
 	var stages: Array = ascent.stages
@@ -133,8 +166,8 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 		var altitude: float = maxf(0.0, radius - R_EARTH)
 		var vertical_speed: float = vx * up_x + vy * up_y
 		var horizontal_speed: float = vx * down_x + vy * down_y
-		var mass: float = _mass(stages, stage, propellant, fairing_on, fairing_mass, payload_kg)
-		var density: float = SEA_LEVEL_DENSITY * exp(-altitude / SCALE_HEIGHT) if altitude < 130000.0 else 0.0
+		var mass: float = stack_mass(stages, stage, propellant, fairing_on, fairing_mass, payload_kg)
+		var density: float = air_density(altitude)
 
 		var air_vx: float = vx - down_x * ground_speed * (radius / R_EARTH)
 		var air_vy: float = vy - down_y * ground_speed * (radius / R_EARTH)
@@ -143,7 +176,6 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 		var air_up: float = air_vx * up_x + air_vy * up_y
 		var air_down: float = air_vx * down_x + air_vy * down_y
 		var mach: float = airspeed_mag / speed_of_sound_mps(altitude)
-		var cd: float = mach_drag_cd(mach)
 		var dynamic_pressure: float = 0.5 * density * airspeed_sq
 
 		var thrusting := phase in ["burn", "circularize"]
@@ -160,26 +192,18 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 		if phase == "circularize" or (phase == "burn" and stage == stages.size() - 1 and apogee_radius_64(px, py, vx, vy) > R_EARTH + (target_apogee - R_EARTH) * 0.9):
 			step = FINE_STEP
 
-		var grav_factor: float = -MU / (radius * radius * radius)
-		var ax: float = px * grav_factor
-		var ay: float = py * grav_factor
-		var non_grav_x: float = 0.0
-		var non_grav_y: float = 0.0
-
-		if airspeed_mag > 0.5 and not clamped:
-			var drag_acc: float = dynamic_pressure * cd * area / mass
-			non_grav_x -= (air_vx / airspeed_mag) * drag_acc
-			non_grav_y -= (air_vy / airspeed_mag) * drag_acc
+		var drag_acc := drag_acceleration(dynamic_pressure, mach, area, mass, airspeed_mag) if not clamped else 0.0
+		var non_grav_x := -air_vx * drag_acc
+		var non_grav_y := -air_vy * drag_acc
 
 		var throttle: float = 0.0
 		var current_thrust: float = 0.0
 		if thrusting:
 			var s: Dictionary = stages[stage]
-			var vacuum: float = float(s.thrustVacuumN)
-			var full_thrust: float = vacuum - (vacuum - float(s.get("thrustSeaLevelN", vacuum))) * exp(-altitude / SCALE_HEIGHT)
+			var full_thrust := ambient_thrust(s, altitude)
 			throttle = clampf(0.28 + 0.72 * (t / CLAMP_HOLD_TIME), 0.28, 1.0) if clamped else 1.0
 			current_thrust = full_thrust * throttle
-			var flow: float = vacuum / (float(s.ispVacuumS) * G0)
+			var flow := propellant_flow(s)
 
 			var desired: float = pitch
 			if clamped:
@@ -187,9 +211,9 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 			elif phase == "circularize":
 				desired = 0.0
 			elif stage == 0:
-				desired = PI / 2.0 if (airspeed_mag < VERTICAL_RISE_SPEED or altitude < VERTICAL_CLEAR_ALTITUDE) else minf(PI / 2.0 - kick, air_path)
+				desired = booster_pitch(altitude, airspeed_mag, air_path, kick)
 			else:
-				desired = _upper_stage_pitch(pitch, radius, vertical_speed, horizontal_speed, full_thrust / mass, mass, flow, float(s.ispVacuumS), target)
+				desired = upper_stage_pitch(pitch, radius, vertical_speed, horizontal_speed, full_thrust / mass, mass, flow, float(s.ispVacuumS), target)
 
 			pitch = move_toward(pitch, desired, MAX_PITCH_RATE * step)
 			var thrust_acc: float = current_thrust / mass
@@ -229,12 +253,10 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 			fairing_on = false
 			events.fairing = t
 
-		var total_ax: float = ax + non_grav_x
-		var total_ay: float = ay + non_grav_y
-		var next_vx: float = vx
-		var next_vy: float = vy
-		var next_px: float = px
-		var next_py: float = py
+		var next_px: float
+		var next_py: float
+		var next_vx: float
+		var next_vy: float
 		if clamped:
 			var pad_angle: float = omega * (t + step)
 			next_px = R_EARTH * sin(pad_angle)
@@ -242,17 +264,11 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 			next_vx = R_EARTH * omega * cos(pad_angle)
 			next_vy = -R_EARTH * omega * sin(pad_angle)
 		else:
-			# Symplectic Velocity-Verlet integration (conserves orbital energy & apogee across long coasts!)
-			var vx_half: float = vx + 0.5 * total_ax * step
-			var vy_half: float = vy + 0.5 * total_ay * step
-			next_px = px + vx_half * step
-			next_py = py + vy_half * step
-			var next_r_verlet: float = sqrt(next_px * next_px + next_py * next_py)
-			var next_grav: float = -MU / (next_r_verlet * next_r_verlet * next_r_verlet)
-			var total_ax2: float = next_px * next_grav + non_grav_x
-			var total_ay2: float = next_py * next_grav + non_grav_y
-			next_vx = vx_half + 0.5 * total_ax2 * step
-			next_vy = vy_half + 0.5 * total_ay2 * step
+			var next := integrate(px, py, vx, vy, radius, non_grav_x, non_grav_y, step)
+			next_px = next[0]
+			next_py = next[1]
+			next_vx = next[2]
+			next_vy = next[3]
 
 		if thrusting and not clamped:
 			var next_r: float = sqrt(next_px * next_px + next_py * next_py)
@@ -301,7 +317,7 @@ static func simulate(ascent: Dictionary, payload_kg: float, target: Dictionary) 
 	var final_vs: float = vx * final_up_x + vy * final_up_y
 	var final_hs: float = vx * final_down_x + vy * final_down_y
 	var final_s2_pct: float = (propellant / s2_cap) if stage > 0 else 0.0
-	var final_mass: float = _mass(stages, stage, propellant, fairing_on, fairing_mass, payload_kg)
+	var final_mass: float = stack_mass(stages, stage, propellant, fairing_on, fairing_mass, payload_kg)
 	samples.append(_make_sample(
 		t, px, py, vx, vy, pitch, atan2(final_vs, final_hs), atan2(final_vs, final_hs),
 		sqrt(vx * vx + vy * vy), final_vs, final_hs,
@@ -346,7 +362,7 @@ static func _make_sample(
 ## Zero-effort-miss guidance on the vertical channel: arrive at the insertion radius with no
 ## vertical speed when the speed target is met. Time to go comes from the rocket equation; the
 ## pitch is held for the last seconds, where the command would grow without bound.
-static func _upper_stage_pitch(current: float, radius: float, vertical_speed: float, horizontal_speed: float, thrust_accel: float, mass: float, flow: float, isp: float, target: Dictionary) -> float:
+static func upper_stage_pitch(current: float, radius: float, vertical_speed: float, horizontal_speed: float, thrust_accel: float, mass: float, flow: float, isp: float, target: Dictionary) -> float:
 	var target_radius: float = target.radius
 	var target_speed: float = target.speed
 	var time_to_go := mass / flow * (1.0 - exp(-maxf(0.0, target_speed - horizontal_speed) / (isp * G0)))
@@ -357,7 +373,7 @@ static func _upper_stage_pitch(current: float, radius: float, vertical_speed: fl
 	var needed := vertical_command + MU / (radius * radius) - horizontal_speed * horizontal_speed / radius
 	return asin(clampf(needed / thrust_accel, -0.4, 0.85))
 
-static func _mass(stages: Array, stage: int, propellant: float, fairing_on: bool, fairing_mass: float, payload_kg: float) -> float:
+static func stack_mass(stages: Array, stage: int, propellant: float, fairing_on: bool, fairing_mass: float, payload_kg: float) -> float:
 	var mass := payload_kg + maxf(0.0, propellant) + (fairing_mass if fairing_on else 0.0)
 	for i in range(stage, stages.size()):
 		mass += float(stages[i].dryMassKg)
@@ -430,3 +446,45 @@ static func sample_at(samples: Array, t: float) -> Dictionary:
 		"s2_fuel_pct": lerpf(float(a.s2_fuel_pct), float(b.s2_fuel_pct), u),
 		"clamped": a.clamped and t < CLAMP_HOLD_TIME
 	}
+
+## Osculating Earth-centered conic in the same plane and precision as the ascent state.
+## The orbital coordinates are (py, px), matching the existing orbital view.
+static func coast_elements(px: float, py: float, vx: float, vy: float) -> Dictionary:
+	var radius := sqrt(px * px + py * py)
+	var momentum := py * vx - px * vy
+	var energy := (vx * vx + vy * vy) * 0.5 - MU / radius
+	var ex := vx * momentum / MU - py / radius
+	var ey := -vy * momentum / MU - px / radius
+	var eccentricity := sqrt(ex * ex + ey * ey)
+	var angle := atan2(px, py)
+	var arg := atan2(ey, ex) if eccentricity > 0.0000001 else angle
+	var direction := 1.0 if momentum >= 0.0 else -1.0
+	var anomaly := wrapf((angle - arg) * direction, -PI, PI)
+	var parameter := momentum * momentum / MU
+	var periapsis := parameter / (1.0 + eccentricity)
+	var apoapsis := INF
+	var phase := 0.0
+	var period := 0.0
+	if energy < 0.0:
+		var a := -MU / (2.0 * energy)
+		apoapsis = a * (1.0 + eccentricity)
+		period = TAU * sqrt(a * a * a / MU)
+		var eccentric_anomaly := atan2(sqrt(maxf(0.0, 1.0 - eccentricity * eccentricity)) * sin(anomaly), eccentricity + cos(anomaly))
+		phase = fposmod(eccentric_anomaly - eccentricity * sin(eccentric_anomaly), TAU) * period / TAU
+	return {
+		"energy": energy, "momentum": momentum, "eccentricity": eccentricity,
+		"arg": arg, "direction": direction, "anomaly": anomaly, "parameter": parameter,
+		"periapsis": periapsis, "apoapsis": apoapsis, "period": period, "phase": phase,
+		"to_apoapsis": fposmod(period * 0.5 - phase, period) if period > 0.0 else INF
+	}
+
+static func orbit_from_coast(coast: Dictionary) -> OrbitState:
+	if coast.energy >= 0.0 or coast.eccentricity >= 1.0:
+		return null
+	var orbit := OrbitState.new()
+	orbit.semi_major_axis_km = -MU / (2000.0 * float(coast.energy))
+	orbit.eccentricity = float(coast.eccentricity)
+	orbit.arg_periapsis_rad = float(coast.arg)
+	orbit.time_since_periapsis_s = float(coast.phase)
+	orbit.direction = float(coast.direction)
+	return orbit

@@ -31,6 +31,7 @@ var _camera_mode := "Spacecraft"
 var _map_view := false
 var _ship_camera := Vector3(0.55, 0.65, 0.18)
 var _map_camera := Vector3(0.55, 0.65, 190.0)
+var _map_pan := Vector3.ZERO
 var _craft_visual: Node3D
 var _map_button: Button
 var _dragging := false
@@ -63,6 +64,7 @@ var _skip_image_period_s := 0.0
 var _skip_image_base := 0
 var _extension_checked := false
 var _wait_target := -1.0
+var _scripted_burn := false
 var _burn_panel: VBoxContainer
 var remaining_propellant_kg := 0.0
 var shared_launch: Control
@@ -314,23 +316,36 @@ func _process(delta: float) -> void:
 	_update_battery_hud()
 	_update_mission_objectives()
 	_update_objectives()
-	if is_instance_valid(_burn_panel): _burn_panel.refresh()
+	if is_instance_valid(_burn_panel):
+		_burn_panel.refresh()
+		if _scripted_burn and _wait_target < 0.0:
+			_scripted_burn = false
+			_burn_panel.start_planned_burn()
 	if orbit != null:
 		_update_camera()
 		var pixels := maxf(1.0, float(_view.size.y))
 		var diameter := 8.0 * 2.0 * _camera.global_position.distance_to(_marker.global_position) * tan(deg_to_rad(_camera.fov) * 0.5) / pixels
 		_marker.scale = Vector3.ONE * maxf(0.5, diameter) if _map_view else Vector3.ONE
 		_marker.visible = _map_view
+		if _map_view: _update_map_readout()
 		_craft_visual.visible = not _map_view and shared_launch == null
 		_craft_visual.position = _marker.position
 
 func _update_position() -> void:
 	var pos: Vector2 = FlightSim.position_on_orbit_km(orbit.semi_major_axis_km, orbit.eccentricity, orbit.time_since_periapsis_s, orbit.mu)
+	var velocity := FlightSim.velocity_at_orbit_position_kms(orbit, pos)
+	velocity.y *= orbit.direction
+	velocity = velocity.rotated(orbit.arg_periapsis_rad)
+	pos.y *= orbit.direction
 	position_km = pos.rotated(orbit.arg_periapsis_rad)
 	_marker.position = Vector3(position_km.x, 0.0, position_km.y) * FlightSim.RENDER_SCALE
+	var preview_nose := _craft_visual.global_basis.x
+	var nose := Vector2(preview_nose.x, preview_nose.z)
 	if is_instance_valid(_shared_rocket):
 		_marker.position = Vector3(position_km.y * 1000.0, position_km.x * 1000.0 - 6371000.0, 0)
 		shared_launch.place_craft(position_km.y * 1000.0, position_km.x * 1000.0)
+		var rocket_nose := _shared_rocket.global_basis.y
+		nose = Vector2(rocket_nose.y, rocket_nose.x)
 	var radius := float(position_km.length())
 	altitude_km = radius - FlightSim.R_EARTH_KM
 	speed_kms = FlightSim.speed_at_radius_kms(radius, orbit.semi_major_axis_km, orbit.mu)
@@ -342,7 +357,16 @@ func _update_position() -> void:
 	_flight_hud.sun_badge.text = "ECLIPSE" if in_eclipse else "SUNLIGHT"
 	_flight_hud.sun_badge.add_theme_color_override("font_color", UI.KSP_AMBER if in_eclipse else UI.KSP_GREEN_TEXT)
 	var bat_frac := (battery_charge_wh / battery_capacity_wh) if battery_capacity_wh > 0.0 else 1.0
-	_flight_hud.update_telemetry(altitude_km * 1000.0, speed_kms * 1000.0, "Orbit", 0.0, rad_to_deg(atan2(position_km.y, position_km.x)) + 90.0, 0.0, bat_frac, 0.0, mission_elapsed_s, false)
+	var up := position_km.normalized()
+	var downrange := Vector2(-up.y, up.x)
+	var nose_pitch := atan2(nose.dot(up), nose.dot(downrange))
+	var radial_speed := velocity.dot(up)
+	var prograde_pitch := atan2(radial_speed, velocity.dot(downrange))
+	_flight_hud.update_telemetry(
+		altitude_km * 1000.0, speed_kms * 1000.0, "Orbit", nose_pitch,
+		rad_to_deg(position_km.angle()) + 90.0, 0.0, bat_frac, radial_speed * 1000.0,
+		mission_elapsed_s, false, prograde_pitch
+	)
 
 func is_in_eclipse(pos_km: Vector2) -> bool:
 	return pos_km.x < 0.0 and absf(pos_km.y) < FlightSim.R_EARTH_KM
@@ -367,6 +391,40 @@ func toggle_map_view() -> void:
 	_map_button.tooltip_text = "Flight view (M)" if _map_view else "Map view (M)"
 	_update_camera()
 
+	_marker.visible = _map_view
+	if _map_view:
+		_update_map_readout()
+	else:
+		_flight_hud.set_map_readout("")
+		_flight_hud.update_map_markers(_camera, [])
+
+func _update_map_readout() -> void:
+	var a := orbit.semi_major_axis_km
+	var e := orbit.eccentricity
+	var pe := a * (1.0 - e)
+	var ap := a * (1.0 + e)
+	var period := FlightSim.orbital_period_s(a, orbit.mu)
+	var scale := FlightSim.RENDER_SCALE
+	var origin := Vector3.ZERO
+	var axis := Vector3(cos(orbit.arg_periapsis_rad), 0.0, sin(orbit.arg_periapsis_rad))
+	if is_instance_valid(shared_launch):
+		scale = 1000.0
+		origin = _marker.get_parent().to_global(_shared_center)
+		axis = Vector3(axis.z, axis.x, 0.0)
+	var markers: Array = [[_marker.global_position, "Spacecraft"]]
+	var text := "Ap %.1f km  ·  Pe %.1f km" % [ap - FlightSim.R_EARTH_KM, pe - FlightSim.R_EARTH_KM]
+	if e >= 0.001:
+		var to_ap := fposmod(period * 0.5 - orbit.time_since_periapsis_s, period)
+		var to_pe := fposmod(-orbit.time_since_periapsis_s, period)
+		var seconds := ceili(minf(to_ap, to_pe))
+		text += "\nNext %s in %d:%02d" % ["Ap" if to_ap < to_pe else "Pe", seconds / 60, seconds % 60]
+		markers.append([origin + axis * pe * scale, "Pe"])
+		markers.append([origin - axis * ap * scale, "Ap"])
+	else:
+		text += "\nNearly circular orbit"
+	_flight_hud.set_map_readout(text)
+	_flight_hud.update_map_markers(_camera, markers)
+
 func set_camera_preset(value: String) -> void:
 	if orbit == null: return
 	_camera_mode = value
@@ -387,6 +445,8 @@ func _update_camera() -> void:
 			_camera.look_at(target, shared_launch.local_frame().y)
 			shared_launch.update_world_visibility()
 			return
+	if _map_view:
+		target += _map_pan
 	_camera.position = target + Vector3(sin(_yaw)*cos(_pitch),sin(_pitch),cos(_yaw)*cos(_pitch)) * _distance
 	_camera.look_at(target, Vector3.UP)
 	if is_instance_valid(shared_launch):
@@ -395,9 +455,13 @@ func _update_camera() -> void:
 		_earth.update_horizon(_camera)
 
 func _reset_view() -> void:
+	if _map_view:
+		_map_pan = Vector3.ZERO
 	_yaw = 0.55
 	_pitch = 0.65
 	set_camera_preset(_camera_mode)
+	if _map_view and orbit != null:
+		_update_map_readout()
 
 func _view_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -405,9 +469,14 @@ func _view_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_RIGHT: _dragging = event.pressed
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 1.5 if shared_launch != null else 0.06, 100000000.0 if shared_launch != null else 5000.0)
-	elif event is InputEventMouseMotion and _dragging:
-		_yaw -= event.relative.x * 0.01
-		_pitch = clampf(_pitch + event.relative.y * 0.01, -1.4, 1.4)
+	elif event is InputEventMouseMotion:
+		if _map_view and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
+			_map_pan += _camera.project_position(-event.relative, _distance) - _camera.project_position(Vector2.ZERO, _distance)
+			_update_camera()
+			_update_map_readout()
+		elif _dragging:
+			_yaw -= event.relative.x * 0.01
+			_pitch = clampf(_pitch + event.relative.y * 0.01, -1.4, 1.4)
 	elif event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_LEFT: _yaw -= 0.1
@@ -419,7 +488,12 @@ func _view_input(event: InputEvent) -> void:
 
 func _input(event: InputEvent) -> void:
 	if EventManager.blocking: return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M: toggle_map_view()
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_M: toggle_map_view()
+			KEY_G:
+				if is_instance_valid(_burn_panel) and _burn_panel.has_planned_burn():
+					_scripted_burn = true
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed: _dragging = false
 
 func _initialize_power() -> void:
@@ -545,7 +619,7 @@ func _eclipse_fraction() -> float:
 	return 72.0 / 1436.0 if mission.get("targetOrbit", "") in ["GEO", "GTO"] else FlightSim.eclipse_fraction(orbit.semi_major_axis_km)
 
 func _sun_phase(period: float, fraction: float) -> float:
-	return fposmod(orbit.time_since_periapsis_s + orbit.arg_periapsis_rad / TAU * period - period * (0.5 + fraction * 0.5), period)
+	return fposmod(orbit.time_since_periapsis_s + orbit.arg_periapsis_rad / TAU * period * orbit.direction - period * (0.5 + fraction * 0.5), period)
 
 func _award_beacon(at: float) -> void:
 	for definition in mission.get("objectives", []):

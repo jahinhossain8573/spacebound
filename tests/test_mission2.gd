@@ -58,8 +58,8 @@ func run_tests() -> void:
 	var launch = load("res://scenes/Launch.tscn").instantiate()
 	root.add_child(launch)
 	launch.set_process(false)
-	launch.ignite()
-	launch.advance_ascent(launch.ascent_duration)
+	launch.toggle_scripted_flight()
+	launch.advance_ascent(20001.0)
 	var flight = launch._flight
 	flight.set_process(false)
 	check(gm.last_result.objectives.size() == 4 and gm.last_result.objectives[0].done and gm.last_result.objectives[2].done, "launch and downlink objectives")
