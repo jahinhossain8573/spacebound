@@ -5,6 +5,7 @@ const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
 const ASCENT = preload("res://scripts/AscentSim.gd")
 const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
+const LAUNCH_PLUME = preload("res://scripts/LaunchPlume.gd")
 const SPACE_CENTER = preload("res://scripts/SpaceCenterWorld.gd")
 const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const LIVE_ASCENT = preload("res://scripts/LiveAscent.gd")
@@ -48,9 +49,8 @@ var _rocket: Node3D
 var _stage: Node3D
 var _fairing_left: Node3D
 var _fairing_right: Node3D
-var _stage1_flame: MeshInstance3D
-var _stage1_core: MeshInstance3D
-var _upper_flame: MeshInstance3D
+var _stage1_flame: LAUNCH_PLUME
+var _upper_flame: LAUNCH_PLUME
 var _payload: Node3D
 var _camera: Camera3D
 var _flash: MeshInstance3D
@@ -355,11 +355,11 @@ func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
 	var upper_stage := model.get_node_or_null("stage_2") as Node3D
 	if upper_stage:
 		_upper_focus = (upper_stage.position.y + rocket_height) / 2.0
-	_stage1_flame = _add_flame(_stage, _stage.find_child("exhaust_stage_1", true, false) as Node3D, 1.25)
+	_stage1_flame = _add_flame(_stage, _stage.find_child("exhaust_stage_1", true, false) as Node3D, false)
 	_stage1_flame.name = "Flame"
 	var upper := model.find_child("exhaust_stage_2", true, false) as Node3D
 	if upper:
-		_upper_flame = _add_flame(upper.get_parent() as Node3D, upper, 0.55)
+		_upper_flame = _add_flame(upper.get_parent() as Node3D, upper, true)
 	var mount := model.find_child("payload_mount", true, false) as Node3D
 	_payload = SPACECRAFT.build(build.bus, build.installed_components)
 	if mount and _payload:
@@ -369,42 +369,16 @@ func _assemble_model_rocket(model: Node3D, build: Dictionary) -> void:
 		_payload.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, dims.z / 2.0, 0))
 		_payload_view_distance = maxf(dims.x, maxf(dims.y, dims.z)) * 6.0
 
-func _add_flame(parent: Node3D, exhaust: Node3D, size := 1.0) -> MeshInstance3D:
-	var height := rocket_height * 0.16 * size
-	var radius := rocket_height * 0.028 * size
-	var flame := MeshInstance3D.new()
-	var outer_mesh := CylinderMesh.new()
-	outer_mesh.top_radius = 0.0
-	outer_mesh.bottom_radius = radius
-	outer_mesh.height = height
-	flame.mesh = outer_mesh
-	var outer_mat := StandardMaterial3D.new()
-	outer_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	outer_mat.albedo_color = Color(1.0, 0.58, 0.12, 0.88)
-	outer_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flame.material_override = outer_mat
-	flame.position = parent.to_local(exhaust.global_position) + Vector3(0, -height / 2.0, 0)
-	flame.rotation.z = PI
-	flame.set_meta("nozzle_local", parent.to_local(exhaust.global_position))
-	flame.set_meta("base_height", height)
-
-	# Bright white-yellow Mach shock core inside the exhaust plume
-	var core := MeshInstance3D.new()
-	var core_mesh := CylinderMesh.new()
-	core_mesh.top_radius = 0.0
-	core_mesh.bottom_radius = radius * 0.52
-	core_mesh.height = height * 0.58
-	core.mesh = core_mesh
-	core.position.y = -height * 0.20
-	var core_mat := StandardMaterial3D.new()
-	core_mat.albedo_color = Color(1.0, 0.96, 0.82, 1.0)
-	core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	core.material_override = core_mat
-	flame.add_child(core)
-
-	flame.visible = false
-	parent.add_child(flame)
-	return flame
+func _add_flame(parent: Node3D, exhaust: Node3D, upper_stage: bool) -> LAUNCH_PLUME:
+	var launcher: Dictionary = GameManager.current_build.launcher
+	var diameter := float(launcher.ascent.get("diameterMeters", 1.2))
+	var length_ratio := 0.17 if upper_stage else (0.61 if launcher.id == "launcher_vega_c" else 0.48)
+	var nozzle_width := diameter * (0.34 if upper_stage else 0.78)
+	var plume := LAUNCH_PLUME.new()
+	plume.position = parent.to_local(exhaust.global_position) if exhaust else Vector3.ZERO
+	plume.setup(rocket_height * length_ratio, nozzle_width, upper_stage)
+	parent.add_child(plume)
+	return plume
 
 func _assemble_primitive_rocket() -> void:
 	var radius := rocket_height * 0.045
@@ -427,12 +401,12 @@ func _assemble_primitive_rocket() -> void:
 	var s1_exhaust := Node3D.new()
 	s1_exhaust.position.y = -rocket_height * 0.05
 	_stage.add_child(s1_exhaust)
-	_stage1_flame = _add_flame(_stage, s1_exhaust, 1.25)
+	_stage1_flame = _add_flame(_stage, s1_exhaust, false)
 	_stage1_flame.name = "Flame"
 	var upper_exhaust := Node3D.new()
 	upper_exhaust.position.y = rocket_height * 0.5
 	_rocket.add_child(upper_exhaust)
-	_upper_flame = _add_flame(_rocket, upper_exhaust, 0.55)
+	_upper_flame = _add_flame(_rocket, upper_exhaust, true)
 
 func calculate_reliability(base: float, nodes: Array) -> float:
 	var result := base
@@ -631,30 +605,14 @@ func _apply_ascent_state() -> void:
 	_rocket.rotation.z = atan2(-axis.x, axis.y)
 	SPACE_CENTER.update_atmosphere(_env_data, 100000.0 if _map_view else _ascent.altitude)
 
-	var s1_firing := _ascent.stage == 0 and _ascent.applied_throttle > 0.0
-	var s2_firing := _ascent.stage == 1 and _ascent.applied_throttle > 0.0
-	if is_instance_valid(_pad_rig.get("pad_smoke")):
-		_pad_rig.pad_smoke.emitting = s1_firing and _ascent.altitude < 140.0
-	if is_instance_valid(_stage) and _stage.has_node("Flame"):
-		var flame := _stage.get_node("Flame") as Node3D
-		flame.visible = s1_firing
-		if s1_firing:
-			_animate_plume(flame, _ascent.applied_throttle, _ascent.altitude)
-	if _upper_flame:
-		_upper_flame.visible = s2_firing
-		if s2_firing:
-			_animate_plume(_upper_flame, _ascent.applied_throttle, _ascent.altitude)
-
-func _animate_plume(flame: Node3D, throttle: float, alt_m: float) -> void:
-	var vac_expand := lerpf(1.0, 2.35, clampf(alt_m / 55000.0, 0.0, 1.0))
-	var flicker := 0.94 + 0.12 * absf(sin(_sim_time * 37.0))
-	var len_scale := maxf(0.25, throttle) * lerpf(1.0, 1.65, clampf(alt_m / 55000.0, 0.0, 1.0)) * flicker
-	var rad_scale := sqrt(maxf(0.25, throttle)) * vac_expand * (0.96 + 0.08 * cos(_sim_time * 43.0))
-	flame.scale = Vector3(rad_scale, len_scale, rad_scale)
-	if flame.has_meta("nozzle_local") and flame.has_meta("base_height"):
-		var nl: Vector3 = flame.get_meta("nozzle_local")
-		var bh: float = float(flame.get_meta("base_height"))
-		flame.position = nl + Vector3(0.0, -bh * len_scale * 0.5, 0.0)
+	var throttle := _ascent.applied_throttle
+	var altitude := _ascent.altitude
+	var stage1_throttle := throttle if _ascent.stage == 0 else 0.0
+	SPACE_CENTER.set_pad_exhaust(_pad_rig, stage1_throttle > 0.0 and altitude < 140.0)
+	if is_instance_valid(_stage1_flame):
+		_stage1_flame.update_thrust(stage1_throttle, altitude)
+	if is_instance_valid(_upper_flame):
+		_upper_flame.update_thrust(throttle if _ascent.stage == 1 else 0.0, altitude)
 
 func _process_milestones() -> void:
 	for event in _ascent.events:
@@ -762,6 +720,7 @@ func _explode(reason := "") -> void:
 	_flash.position = _rocket.position
 	_flash.visible = true
 	_rocket.visible = false
+	SPACE_CENTER.set_pad_exhaust(_pad_rig, false)
 	_skip.disabled = true
 	_failure_timer = 3.0
 	_log("Launch vehicle failure." if reason.is_empty() else reason)
@@ -788,7 +747,7 @@ func _finish_success() -> void:
 	GameManager.initial_orbit = orbit
 	SPACE_CENTER.update_atmosphere(_env_data, 100000.0)
 	if _upper_flame:
-		_upper_flame.hide()
+		_upper_flame.update_thrust(0.0, _ascent.altitude)
 	_clear_debris()
 	var was_map := _map_view
 	if was_map:

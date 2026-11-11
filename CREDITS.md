@@ -16,3 +16,7 @@ Original Spacebounds model and carbon twill texture. The supplied museum, launch
 
 - Earth uses [Natural Earth land and lake geometry](https://www.naturalearthdata.com/downloads/110m-physical-vectors/) and [NASA Earth Observatory Blue Marble imagery](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/#august) by Reto Stöckli, with ocean colors adjusted. The regional Florida texture is cropped from [NASA’s August Blue Marble imagery](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/) at 500 meters per pixel. The game export retains the 20 patches and uses a continuous shell below the launch area, with relief shown in the texture.
 - Kennedy Space Center LC-39A is an original Spacebounds model with generated textures. Supplied aerial and launch photographs, a pad location map, and an in-game screenshot served as visual references. Their original URLs were unspecified.
+
+# VFX credits
+
+- The main menu vent vapor and launch pad clouds use `smoke_07.png` and `smoke_08.png`. The launch plume uses `flame_04.png`. These textures come from [Kenney Vleugels' Particle Pack](https://kenney.nl/assets/particle-pack) v1.1 under CC0 1.0, sourced from the [Calinou mirror](https://github.com/Calinou/kenney-particle-pack).

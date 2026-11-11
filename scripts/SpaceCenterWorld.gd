@@ -3,6 +3,9 @@ extends RefCounted
 ## Kennedy Space Center scenery, pad effects and dynamic launch atmosphere.
 
 const KENNEDY := preload("res://assets/3d-models/launch_area/kennedy_launch_area.glb")
+const SMOKE_SHADER := preload("res://assets/vfx/launch_smoke.gdshader")
+const DENSE_SMOKE := preload("res://assets/vfx/kenney/smoke_08.png")
+const SOFT_SMOKE := preload("res://assets/vfx/kenney/smoke_07.png")
 const EARTH_VISUAL := preload("res://scripts/EarthVisual.gd")
 const STATION_RANGE_M := 14000.0
 const PAD_DETAIL_RANGE_M := 3500.0
@@ -107,49 +110,80 @@ static func populate_space_center(station: Node3D, rocket_height: float, rocket_
 		_box(jaw, Vector3(0.62, 0.22, 0.32), Vector3(-0.24, 0.08, 0.0), clamp_red_mat)
 		clamps.append(jaw)
 
-	# Pad flame-trench steam / exhaust billowing cloud particles (CPU Particles for gl_compatibility!)
-	var smoke := CPUParticles3D.new()
-	smoke.emitting = false
-	smoke.amount = 64
-	smoke.lifetime = 2.4
-	smoke.explosiveness = 0.08
-	smoke.randomness = 0.35
-	var puff := SphereMesh.new()
-	puff.radius = 0.85 * pad_scale
-	puff.height = 1.7 * pad_scale
-	puff.radial_segments = 10
-	puff.rings = 6
-	var puff_mat := StandardMaterial3D.new()
-	puff_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	puff_mat.vertex_color_use_as_albedo = true
-	puff_mat.albedo_color = Color(0.92, 0.93, 0.95, 0.62)
-	puff_mat.roughness = 1.0
-	puff.material = puff_mat
-	smoke.mesh = puff
-	smoke.local_coords = true
-	smoke.position = Vector3(0.0, 0.18, 0.0)
-	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	smoke.emission_sphere_radius = 1.4 * pad_scale
-	smoke.direction = Vector3(0.0, 0.22, 0.0)
-	smoke.spread = 86.0
-	smoke.gravity = Vector3(0.0, 2.6, 0.0)
-	smoke.initial_velocity_min = 7.0 * pad_scale
-	smoke.initial_velocity_max = 18.0 * pad_scale
-	smoke.damping_min = 3.5
-	smoke.damping_max = 6.5
-	var scale_curve := Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.45))
-	scale_curve.add_point(Vector2(0.4, 1.55))
-	scale_curve.add_point(Vector2(1.0, 2.8))
-	smoke.scale_amount_curve = scale_curve
-	var grad := Gradient.new()
-	grad.set_color(0, Color(1.0, 0.88, 0.72, 0.75))
-	grad.add_point(0.25, Color(0.88, 0.89, 0.92, 0.58))
-	grad.set_color(1, Color(0.75, 0.78, 0.82, 0.0))
-	smoke.color_ramp = grad
-	rig.add_child(smoke)
+	var exhaust := [
+		_pad_cloud(rig, Vector3(0.95, 0.13, 0.31), pad_scale, DENSE_SMOKE, false),
+		_pad_cloud(rig, Vector3(-0.91, 0.12, 0.39), pad_scale, SOFT_SMOKE, false),
+		_pad_cloud(rig, Vector3(0.82, 0.12, 0.57), pad_scale, SOFT_SMOKE, true),
+		_pad_cloud(rig, Vector3(-0.89, 0.14, 0.45), pad_scale, DENSE_SMOKE, true)
+	]
+	return {"root": rig, "clamps": clamps, "pad_smoke": exhaust,
+		"ground": ground, "ground_material": ground_material}
 
-	return {"root": rig, "clamps": clamps, "pad_smoke": smoke, "ground": ground, "ground_material": ground_material}
+static func set_pad_exhaust(pad: Dictionary, firing: bool) -> void:
+	for cloud: CPUParticles3D in pad.pad_smoke:
+		if cloud.emitting != firing:
+			cloud.emitting = firing
+
+static func _pad_cloud(parent: Node3D, direction: Vector3, size: float,
+		texture: Texture2D, lingering: bool) -> CPUParticles3D:
+	var puff := QuadMesh.new()
+	puff.size = (Vector2(13.0, 7.0) if lingering else Vector2(6.5, 5.2)) * size
+	var material := ShaderMaterial.new()
+	material.shader = SMOKE_SHADER
+	material.set_shader_parameter("smoke_texture", texture)
+	puff.material = material
+
+	var growth := Curve.new()
+	growth.max_value = 3.0
+	growth.add_point(Vector2(0.0, 0.70))
+	growth.add_point(Vector2(0.34, 1.53))
+	growth.add_point(Vector2(1.0, 2.65))
+	var tint := Gradient.new()
+	if lingering:
+		tint.offsets = PackedFloat32Array([0.0, 0.05, 0.16, 0.55, 0.8, 1.0])
+		tint.colors = PackedColorArray([
+			Color(1.0, 0.96, 0.90, 0.0), Color(1.0, 0.97, 0.93, 0.86),
+			Color(0.98, 0.98, 0.97, 0.94), Color(0.94, 0.95, 0.96, 0.76),
+			Color(0.88, 0.90, 0.93, 0.40), Color(0.88, 0.90, 0.93, 0.0)
+		])
+	else:
+		tint.offsets = PackedFloat32Array([0.0, 0.08, 0.25, 0.58, 1.0])
+		tint.colors = PackedColorArray([
+			Color(1.0, 0.89, 0.76, 0.0), Color(1.0, 0.94, 0.85, 0.92),
+			Color(0.98, 0.97, 0.94, 0.87), Color(0.90, 0.91, 0.93, 0.48),
+			Color(0.86, 0.88, 0.91, 0.0)
+		])
+
+	var smoke := CPUParticles3D.new()
+	smoke.mesh = puff
+	smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	smoke.emitting = false
+	smoke.amount = 100 if lingering else 76
+	smoke.lifetime = 24.0 if lingering else 7.5
+	smoke.randomness = 0.61
+	# The floating origin moves the pad. Local particles stay grounded in the scene.
+	smoke.local_coords = true
+	smoke.draw_order = CPUParticles3D.DRAW_ORDER_VIEW_DEPTH
+	smoke.position = Vector3(direction.x * 2.4, 2.45 if lingering else 1.75, 0.7) * size
+	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	smoke.emission_sphere_radius = (2.0 if lingering else 0.9) * size
+	smoke.direction = direction.normalized()
+	smoke.spread = 18.0 if lingering else 28.0
+	smoke.gravity = (Vector3(0.04, 0.035, 0.06) if lingering else Vector3(0, 0.88, 0)) * size
+	smoke.initial_velocity_min = (0.8 if lingering else 6.0) * size
+	smoke.initial_velocity_max = (2.9 if lingering else 11.0) * size
+	smoke.damping_min = (0.05 if lingering else 0.65) * size
+	smoke.damping_max = (0.16 if lingering else 1.65) * size
+	smoke.angle_min = -180.0
+	smoke.angle_max = 180.0
+	smoke.angular_velocity_min = -24.0
+	smoke.angular_velocity_max = 24.0
+	smoke.scale_amount_min = 0.72
+	smoke.scale_amount_max = 1.35
+	smoke.scale_amount_curve = growth
+	smoke.color_ramp = tint
+	parent.add_child(smoke)
+	return smoke
 
 static func update_visibility(station: Node3D, pad: Dictionary, distance_m: float) -> float:
 	station.visible = distance_m < STATION_RANGE_M

@@ -1,6 +1,16 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/MainMenu.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/MenuLaunchPad.gd" id="2"]
+
+[sub_resource type="Gradient" id="Gradient_menu_shade"]
+offsets = PackedFloat32Array(0, 0.29, 0.55, 0.78)
+colors = PackedColorArray(0.014, 0.021, 0.039, 0.94, 0.014, 0.021, 0.039, 0.78, 0.014, 0.021, 0.039, 0.22, 0.014, 0.021, 0.039, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_menu_shade"]
+gradient = SubResource("Gradient_menu_shade")
+width = 512
+height = 1
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -11,3 +21,35 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 screen = "MainMenu"
+
+[node name="LaunchPadBackground" type="SubViewportContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
+
+[node name="Viewport" type="SubViewport" parent="LaunchPadBackground"]
+own_world_3d = true
+gui_disable_input = true
+size = Vector2i(960, 540)
+msaa_3d = 1
+render_target_update_mode = 4
+
+[node name="LaunchPad" type="Node3D" parent="LaunchPadBackground/Viewport"]
+script = ExtResource("2")
+
+[node name="MenuShade" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_menu_shade")
+expand_mode = 1

@@ -5,11 +5,6 @@ const AnimatedMenuButton = preload("res://scripts/MainMenuButton.gd")
 
 func _ready() -> void:
 	GameManager.state = GameManager.State.MAIN_MENU
-	var background := ColorRect.new()
-	background.color = Color.BLACK
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(background)
 
 	var title := Label.new()
 	title.name = "Title"
