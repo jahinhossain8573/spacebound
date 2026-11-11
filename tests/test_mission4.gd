@@ -51,7 +51,7 @@ func run_tests() -> void:
 	launch.rng.seed = 1
 	launch.ignite()
 	check(not launch.failed, "Seeded Falcon 9 launch succeeds without debug override")
-	launch.advance_ascent(15)
+	launch.advance_ascent(launch.ascent_duration)
 	var flight = launch._flight
 	flight.set_process(false)
 	check(absf(flight.orbit.semi_major_axis_km * (1-flight.orbit.eccentricity) - 6621.0) < 0.1 and absf(flight.orbit.semi_major_axis_km * (1+flight.orbit.eccentricity) - 42164.0) < 0.1, "Launch inserts exact GTO apsides")

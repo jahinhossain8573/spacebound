@@ -2,7 +2,8 @@ extends Control
 
 signal build_changed
 
-const ELECTRON_MODEL := preload("res://assets/3d-models/rockets/electron/launcher_electron.glb")
+const UI = preload("res://scripts/UIStyle.gd")
+const WAREHOUSE = preload("res://scripts/WarehouseWorld.gd")
 const CATEGORIES := ["power", "avionics", "adcs", "comms", "propulsion", "instrument", "thermal", "landing"]
 var mission: Dictionary
 var launcher: Dictionary
@@ -22,19 +23,34 @@ var _viewport_container: SubViewportContainer
 var _craft: Node3D
 var _attachments: Node3D
 var _camera: Camera3D
-var _pitch := 0.35
-var _yaw := 0.6
-var _distance := 5.0
+var _pitch := 0.34
+var _yaw := 0.42
+var _distance := 5.6
 var _dragging := false
 var _dimensions := Vector3.ONE
 var _stats_helper = preload("res://scripts/BuildStats.gd").new()
+const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
+var _mounts: Dictionary = {}
 var _telemetry: VBoxContainer
 var _launch: Button
 var _notice: Label
 var stats: Dictionary = {}
 var review: Array[Dictionary] = []
 
+# KSP VAB UI state
+var _active_category_filter := "all"
+var _part_search_query := ""
+var _cat_rail_buttons: Dictionary = {}
+var _cost_readout_label: Label
+var _budget_readout_label: Label
+var _stage_dv_badge: Label
+var _right_dock: PanelContainer
+var _build_tab_box: VBoxContainer
+var _brief_tab_box: VBoxContainer
+
 func _ready() -> void:
+	GameManager.state = GameManager.State.WORKSHOP
 	mission = GameManager.current_mission if not GameManager.current_mission.is_empty() else GlobalData.get_mission(1)
 	launcher = GlobalData.get_launcher(mission.get("requiredLauncher", ""))
 	bus = GlobalData.get_bus(mission.get("requiredBus", ""))
@@ -50,118 +66,245 @@ func _ready() -> void:
 	GameManager.campaign_changed.connect(_refresh_parts)
 
 func _make_ui() -> void:
-	var outer := VBoxContainer.new()
-	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	outer.add_theme_constant_override("separation", 8)
-	add_child(outer)
-	var header := HBoxContainer.new()
-	outer.add_child(header)
-	var back := Button.new()
-	back.text = "< Back"
-	back.pressed.connect(_back)
-	header.add_child(back)
-	if launcher.id == "launcher_electron":
-		_add_electron_preview(header)
-	var title := Label.new()
-	title.text = "  WORKSHOP   /   " + str(mission.title) + "\n  " + str(launcher.name) + "   •   " + str(bus.name)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_color_override("font_color", Color("279af1"))
-	header.add_child(title)
-	var reset := Button.new()
-	reset.text = "Reset view"
-	reset.pressed.connect(_reset_camera)
-	header.add_child(reset)
-	_launch = Button.new()
-	_launch.text = "Launch"
-	_launch.disabled = true
-	_launch.pressed.connect(_launch_build)
-	header.add_child(_launch)
-	var columns := HBoxContainer.new()
-	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	outer.add_child(columns)
-	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 350
-	columns.add_child(left)
-	var left_label := Label.new()
-	left_label.text = "PARTS CATALOG"
-	left.add_child(left_label)
-	var part_scroll := ScrollContainer.new()
-	part_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	part_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	left.add_child(part_scroll)
-	_category_container = VBoxContainer.new()
-	_category_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	part_scroll.add_child(_category_container)
-	var center := VBoxContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	columns.add_child(center)
+	# 1. Full-screen 3D Warehouse Viewport behind all VAB chrome
 	_viewport_container = SubViewportContainer.new()
+	_viewport_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_viewport_container.stretch = true
-	_viewport_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_viewport_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_viewport_container.focus_mode = Control.FOCUS_ALL
 	_viewport_container.gui_input.connect(_viewport_input)
-	center.add_child(_viewport_container)
+	add_child(_viewport_container)
 	var viewport := SubViewport.new()
 	viewport.name = "SpacecraftViewport"
 	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_viewport_container.add_child(viewport)
-	var objective_panel := PanelContainer.new()
-	objective_panel.name = "MissionObjectivePanel"
-	center.add_child(objective_panel)
-	var objective_margin := MarginContainer.new()
-	for edge in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		objective_margin.add_theme_constant_override(edge, 12)
-	objective_panel.add_child(objective_margin)
-	var objective_content := VBoxContainer.new()
-	objective_margin.add_child(objective_content)
-	var objective_title := Label.new()
-	objective_title.text = "MISSION OBJECTIVE  /  " + str(mission.title)
-	objective_title.add_theme_color_override("font_color", Color("279af1"))
-	objective_content.add_child(objective_title)
-	var objective_brief := Label.new()
-	objective_brief.text = str(mission.get("briefing", ""))
-	objective_brief.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_content.add_child(objective_brief)
-	if mission.has("historyNote"):
-		var history := Label.new()
-		history.text = "History: " + str(mission.historyNote)
-		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		history.add_theme_color_override("font_color", Color("ff8811"))
-		objective_content.add_child(history)
-	var required_names: Array[String] = []
-	for part_id in mission.get("requiredPartIds", []):
-		required_names.append(str(GlobalData.get_part(part_id).get("name", part_id)))
-	var objective_details := Label.new()
-	objective_details.text = "%s  ·  %s km  ·  %s days\nRequired: %s" % [mission.get("targetOrbit", ""), mission.get("targetAltitudeKm", 0), mission.get("durationDays", 0), ", ".join(required_names)]
-	objective_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_details.add_theme_color_override("font_color", Color("ffffff"))
-	objective_content.add_child(objective_details)
+
+	# 2. Top KSP VAB Metallic Header Bar
+	var top_bar := PanelContainer.new()
+	top_bar.anchor_right = 1.0
+	top_bar.offset_bottom = 44
+	top_bar.add_theme_stylebox_override("panel", UI.metallic_panel(Color("262c35"), Color("556070"), 0, 5))
+	add_child(top_bar)
+
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 10)
+	top_bar.add_child(top_row)
+
+	# Search field on top-left (above parts palette)
+	var search := LineEdit.new()
+	search.placeholder_text = "Enter search..."
+	search.custom_minimum_size.x = 248
+	search.add_theme_font_size_override("font_size", 14)
+	search.text_changed.connect(func(q: String):
+		_part_search_query = q.strip_edges().to_lower()
+		_refresh_parts()
+	)
+	top_row.add_child(search)
+
+	for mode_lbl in ["Build", "Mounts", "Cleanroom"]:
+		var tag := PanelContainer.new()
+		tag.add_theme_stylebox_override("panel", UI.inset_well(Color("162530"), Color("386b82"), 3, 4))
+		var tl := Label.new()
+		tl.text = mode_lbl
+		tl.add_theme_font_size_override("font_size", 12)
+		tl.add_theme_color_override("font_color", UI.KSP_CYAN)
+		tag.add_child(tl)
+		top_row.add_child(tag)
+
+	var sp_l := Control.new()
+	sp_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.add_child(sp_l)
+
+	# Center Craft / Mission Name Plaque (matches "Untitled Space Craft" plaque in Photo 3)
+	var plaque := PanelContainer.new()
+	plaque.custom_minimum_size.x = 380
+	plaque.add_theme_stylebox_override("panel", UI.inset_well(Color("171c23"), Color("5c6778"), 4, 5))
+	top_row.add_child(plaque)
+	var title := Label.new()
+	title.text = "%s   •   %s (%s)" % [str(mission.title), str(bus.name), str(launcher.name)]
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color("ffd97d"))
+	plaque.add_child(title)
+
+	var sp_r := Control.new()
+	sp_r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.add_child(sp_r)
+
+	# Top-right KSP Action Toolbar (Reset Cam, Readiness Review, Green Launch, Orange Exit)
+	var reset := Button.new()
+	reset.text = "Reset View"
+	reset.add_theme_font_size_override("font_size", 14)
+	UI.style_button(reset, "slate", 10, 4, 3)
+	reset.pressed.connect(_reset_camera)
+	top_row.add_child(reset)
+
+	var top_review := Button.new()
+	top_review.text = "Readiness"
+	top_review.tooltip_text = "Run Flight Readiness Review"
+	top_review.add_theme_font_size_override("font_size", 14)
+	UI.style_button(top_review, "blue", 10, 4, 3)
+	top_review.pressed.connect(_show_review)
+	top_row.add_child(top_review)
+
+	_launch = Button.new()
+	_launch.text = "▶ Launch"
+	_launch.disabled = true
+	_launch.custom_minimum_size.x = 108
+	_launch.add_theme_font_size_override("font_size", 15)
+	UI.style_button(_launch, "green", 12, 4, 3)
+	_launch.pressed.connect(_launch_build)
+	top_row.add_child(_launch)
+
+	var back := Button.new()
+	back.text = "< Back"
+	back.tooltip_text = "Return to Mission Control"
+	back.add_theme_font_size_override("font_size", 14)
+	UI.style_button(back, "amber", 10, 4, 3)
+	back.pressed.connect(_back)
+	top_row.add_child(back)
+
+	# 3. Left KSP VAB Parts Palette (Category Icon Rail + Translucent Parts Drawer)
+	var left_dock := HBoxContainer.new()
+	left_dock.anchor_bottom = 1.0
+	left_dock.offset_left = 0
+	left_dock.offset_top = 44
+	left_dock.offset_right = 304
+	left_dock.offset_bottom = -84
+	left_dock.add_theme_constant_override("separation", 0)
+	add_child(left_dock)
+
+	var cat_rail := PanelContainer.new()
+	cat_rail.custom_minimum_size.x = 40
+	cat_rail.add_theme_stylebox_override("panel", UI.metallic_panel(Color("1e232b"), Color("4a5464"), 0, 3))
+	left_dock.add_child(cat_rail)
+	var rail_col := VBoxContainer.new()
+	rail_col.add_theme_constant_override("separation", 3)
+	cat_rail.add_child(rail_col)
+
+	for cat_id in ["all"] + CATEGORIES:
+		var cb := Button.new()
+		cb.custom_minimum_size = Vector2(32, 32)
+		cb.tooltip_text = "Filter: " + cat_id.to_upper()
+		UI.style_button(cb, "tab_active" if cat_id == "all" else "slate", 2, 2, 3)
+		var ic_center := CenterContainer.new()
+		ic_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		ic_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ic_center.add_child(UI.icon(cat_id, Vector2(18, 18), UI.WHITE))
+		cb.add_child(ic_center)
+		cb.pressed.connect(_set_category_filter.bind(cat_id))
+		rail_col.add_child(cb)
+		_cat_rail_buttons[cat_id] = cb
+
+	var parts_panel := PanelContainer.new()
+	parts_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parts_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parts_panel.add_theme_stylebox_override("panel", UI.metallic_panel(Color(0.18, 0.21, 0.25, 0.90), Color("535d6e"), 0, 6))
+	left_dock.add_child(parts_panel)
+
+	var parts_vbox := VBoxContainer.new()
+	parts_vbox.add_theme_constant_override("separation", 6)
+	parts_panel.add_child(parts_vbox)
+
+	var sort_hdr := Label.new()
+	sort_hdr.text = "Name  ·  Mass  ·  Cost  ·  Power"
+	sort_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sort_hdr.add_theme_font_size_override("font_size", 12)
+	sort_hdr.add_theme_color_override("font_color", UI.MUTED)
+	parts_vbox.add_child(sort_hdr)
+
+	var part_scroll := ScrollContainer.new()
+	part_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	part_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parts_vbox.add_child(part_scroll)
+
+	_category_container = VBoxContainer.new()
+	_category_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_category_container.add_theme_constant_override("separation", 6)
+	part_scroll.add_child(_category_container)
+
+	# 4. Bottom-Left KSP Cost vs Mission Budget Widget
+	var cost_pod := PanelContainer.new()
+	cost_pod.anchor_top = 1.0
+	cost_pod.anchor_bottom = 1.0
+	cost_pod.offset_left = 4
+	cost_pod.offset_top = -80
+	cost_pod.offset_right = 304
+	cost_pod.offset_bottom = -4
+	cost_pod.add_theme_stylebox_override("panel", UI.metallic_panel(Color("252b34"), Color("5a6475"), 4, 6))
+	add_child(cost_pod)
+
+	var cost_col := VBoxContainer.new()
+	cost_col.add_theme_constant_override("separation", 4)
+	cost_pod.add_child(cost_col)
+
+	var cost_well := PanelContainer.new()
+	cost_well.add_theme_stylebox_override("panel", UI.inset_well(UI.LCD_BG, Color("574b24"), 3, 4))
+	cost_col.add_child(cost_well)
+	_cost_readout_label = Label.new()
+	_cost_readout_label.add_theme_font_size_override("font_size", 15)
+	_cost_readout_label.add_theme_color_override("font_color", UI.GOLD)
+	cost_well.add_child(_cost_readout_label)
+
+	var budget_well := PanelContainer.new()
+	budget_well.add_theme_stylebox_override("panel", UI.inset_well(UI.LCD_BG, Color("2e4a29"), 3, 4))
+	cost_col.add_child(budget_well)
+	_budget_readout_label = Label.new()
+	_budget_readout_label.add_theme_font_size_override("font_size", 14)
+	_budget_readout_label.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
+	budget_well.add_child(_budget_readout_label)
+
+	# 5. Right Collapsible Engineer & Loadout Dock
+	_right_dock = PanelContainer.new()
+	_right_dock.anchor_left = 1.0
+	_right_dock.anchor_right = 1.0
+	_right_dock.anchor_bottom = 1.0
+	_right_dock.offset_left = -356
+	_right_dock.offset_top = 50
+	_right_dock.offset_right = -6
+	_right_dock.offset_bottom = -52
+	_right_dock.add_theme_stylebox_override("panel", UI.metallic_panel(Color(0.14, 0.17, 0.21, 0.91), Color("535d6e"), 4, 8))
+	add_child(_right_dock)
+
 	var right_scroll := ScrollContainer.new()
-	right_scroll.custom_minimum_size.x = 400
+	right_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	columns.add_child(right_scroll)
-	var right := VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right_scroll.add_child(right)
+	_right_dock.add_child(right_scroll)
+
+	var right_inner := VBoxContainer.new()
+	right_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_inner.add_theme_constant_override("separation", 8)
+	right_scroll.add_child(right_inner)
+
+	# Build & Telemetry Tab Content
+	_build_tab_box = VBoxContainer.new()
+	_build_tab_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_build_tab_box.add_theme_constant_override("separation", 8)
+	right_inner.add_child(_build_tab_box)
+
 	var installed_label := Label.new()
-	installed_label.text = "INSTALLED PARTS"
-	right.add_child(installed_label)
-	var installed_scroll := ScrollContainer.new()
-	installed_scroll.custom_minimum_size.y = 240
-	installed_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	installed_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	right.add_child(installed_scroll)
+	installed_label.text = "INSTALLED PAYLOAD PARTS"
+	installed_label.add_theme_font_size_override("font_size", 14)
+	installed_label.add_theme_color_override("font_color", UI.KSP_AMBER)
+	_build_tab_box.add_child(installed_label)
+
+	var installed_well := PanelContainer.new()
+	installed_well.add_theme_stylebox_override("panel", UI.inset_well(Color("10151c"), Color("333d4b"), 3, 6))
+	_build_tab_box.add_child(installed_well)
+
 	_installed_container = VBoxContainer.new()
 	_installed_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	installed_scroll.add_child(_installed_container)
+	_installed_container.add_theme_constant_override("separation", 4)
+	installed_well.add_child(_installed_container)
+
 	_fuel_box = VBoxContainer.new()
-	right.add_child(_fuel_box)
+	_fuel_box.add_theme_constant_override("separation", 4)
+	_build_tab_box.add_child(_fuel_box)
 	var fuel_label := Label.new()
-	fuel_label.text = "PROPELLANT (kg)"
+	fuel_label.text = "PROPELLANT TANKS (kg)"
+	fuel_label.add_theme_font_size_override("font_size", 14)
+	fuel_label.add_theme_color_override("font_color", UI.KSP_CYAN)
 	_fuel_box.add_child(fuel_label)
 	_slider = HSlider.new()
 	_slider.max_value = 100.0
@@ -176,49 +319,155 @@ func _make_ui() -> void:
 	_fuel_box.add_child(_spin)
 	_fuel_hint = Label.new()
 	_fuel_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_fuel_hint.add_theme_font_size_override("font_size", 12)
+	_fuel_hint.add_theme_color_override("font_color", UI.MUTED)
 	_fuel_box.add_child(_fuel_hint)
 	var fill := Button.new()
 	fill.text = "Fill to required Δv + 10%"
+	fill.add_theme_font_size_override("font_size", 13)
+	UI.style_button(fill, "blue", 8, 4, 3)
 	fill.pressed.connect(fill_to_required_delta_v)
 	_fuel_box.add_child(fill)
 	_message = Label.new()
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_message.add_theme_font_size_override("font_size", 12)
 	_message.add_theme_color_override("font_color", Color("ff8811"))
 	_fuel_box.add_child(_message)
+
 	_notice = Label.new()
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	right.add_child(_notice)
+	_notice.add_theme_font_size_override("font_size", 13)
+	_build_tab_box.add_child(_notice)
+
 	var review_button := Button.new()
 	review_button.text = "Run Readiness Review"
+	review_button.add_theme_font_size_override("font_size", 14)
+	UI.style_button(review_button, "amber", 10, 5, 3)
 	review_button.pressed.connect(_show_review)
-	right.add_child(review_button)
-	_telemetry = VBoxContainer.new()
-	right.add_child(_telemetry)
+	_build_tab_box.add_child(review_button)
 
-func _add_electron_preview(header: HBoxContainer) -> void:
-	var container := SubViewportContainer.new()
-	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	header.add_child(container)
-	var viewport := SubViewport.new()
-	viewport.name = "ElectronPreview"
-	viewport.size = Vector2i(64, 64)
-	viewport.transparent_bg = true
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	container.add_child(viewport)
-	var model := ELECTRON_MODEL.instantiate() as Node3D
-	model.rotation.z = -0.65
-	model.position = -(model.basis * Vector3(0, 9, 0))
-	viewport.add_child(model)
-	var camera := Camera3D.new()
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 20.0
-	camera.position.z = 25.0
-	viewport.add_child(camera)
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-15, 30, 0)
-	light.light_energy = 2.6
-	viewport.add_child(light)
+	var telem_hdr := Label.new()
+	telem_hdr.text = "ENGINEER REPORT"
+	telem_hdr.add_theme_font_size_override("font_size", 14)
+	telem_hdr.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
+	_build_tab_box.add_child(telem_hdr)
+
+	_telemetry = VBoxContainer.new()
+	_telemetry.add_theme_constant_override("separation", 4)
+	_build_tab_box.add_child(_telemetry)
+
+	# Mission Objective Tab Content
+	_brief_tab_box = VBoxContainer.new()
+	_brief_tab_box.visible = false
+	_brief_tab_box.add_theme_constant_override("separation", 8)
+	right_inner.add_child(_brief_tab_box)
+
+	var objective_panel := PanelContainer.new()
+	objective_panel.name = "MissionObjectivePanel"
+	objective_panel.add_theme_stylebox_override("panel", UI.inset_well(Color("111720"), Color("384556"), 3, 8))
+	_brief_tab_box.add_child(objective_panel)
+	var objective_content := VBoxContainer.new()
+	objective_content.add_theme_constant_override("separation", 6)
+	objective_panel.add_child(objective_content)
+	var objective_title := Label.new()
+	objective_title.text = "MISSION OBJECTIVE  /  " + str(mission.title)
+	objective_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_title.add_theme_font_size_override("font_size", 15)
+	objective_title.add_theme_color_override("font_color", UI.KSP_AMBER)
+	objective_content.add_child(objective_title)
+	var objective_brief := Label.new()
+	objective_brief.text = str(mission.get("briefing", ""))
+	objective_brief.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_brief.add_theme_font_size_override("font_size", 14)
+	objective_content.add_child(objective_brief)
+	if mission.has("historyNote"):
+		var history := Label.new()
+		history.text = "History: " + str(mission.historyNote)
+		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		history.add_theme_font_size_override("font_size", 13)
+		history.add_theme_color_override("font_color", Color("f0c674"))
+		objective_content.add_child(history)
+	var required_names: Array[String] = []
+	for part_id in mission.get("requiredPartIds", []):
+		required_names.append(str(GlobalData.get_part(part_id).get("name", part_id)))
+	var objective_details := Label.new()
+	objective_details.text = "Orbit: %s · %s km · %s days\nRequired Hardware: %s" % [mission.get("targetOrbit", ""), mission.get("targetAltitudeKm", 0), mission.get("durationDays", 0), ", ".join(required_names)]
+	objective_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_details.add_theme_font_size_override("font_size", 14)
+	objective_details.add_theme_color_override("font_color", UI.KSP_CYAN)
+	objective_content.add_child(objective_details)
+
+	# 6. Bottom-Right KSP Engineer App Strip + Stage Δv Pill
+	var bottom_right := HBoxContainer.new()
+	bottom_right.anchor_left = 1.0
+	bottom_right.anchor_right = 1.0
+	bottom_right.anchor_top = 1.0
+	bottom_right.anchor_bottom = 1.0
+	bottom_right.offset_left = -420
+	bottom_right.offset_top = -44
+	bottom_right.offset_right = -6
+	bottom_right.offset_bottom = -4
+	bottom_right.alignment = BoxContainer.ALIGNMENT_END
+	bottom_right.add_theme_constant_override("separation", 6)
+	add_child(bottom_right)
+
+	var dock_bar := PanelContainer.new()
+	dock_bar.add_theme_stylebox_override("panel", UI.metallic_panel(Color("262c35"), Color("5a6475"), 4, 3))
+	bottom_right.add_child(dock_bar)
+	var dock_btns := HBoxContainer.new()
+	dock_btns.add_theme_constant_override("separation", 4)
+	dock_bar.add_child(dock_btns)
+
+	var btn_eng := Button.new()
+	btn_eng.text = "Δv / Engineer"
+	btn_eng.add_theme_font_size_override("font_size", 13)
+	UI.style_button(btn_eng, "tab_active", 8, 3, 3)
+	dock_btns.add_child(btn_eng)
+
+	var btn_brief := Button.new()
+	btn_brief.text = "Briefing"
+	btn_brief.add_theme_font_size_override("font_size", 13)
+	UI.style_button(btn_brief, "slate", 8, 3, 3)
+	dock_btns.add_child(btn_brief)
+
+	var btn_hide := Button.new()
+	btn_hide.text = "Hide UI"
+	btn_hide.add_theme_font_size_override("font_size", 13)
+	UI.style_button(btn_hide, "slate", 8, 3, 3)
+	dock_btns.add_child(btn_hide)
+
+	btn_eng.pressed.connect(func():
+		_right_dock.visible = true
+		_build_tab_box.visible = true
+		_brief_tab_box.visible = false
+		UI.style_button(btn_eng, "tab_active", 8, 3, 3)
+		UI.style_button(btn_brief, "slate", 8, 3, 3)
+	)
+	btn_brief.pressed.connect(func():
+		_right_dock.visible = true
+		_build_tab_box.visible = false
+		_brief_tab_box.visible = true
+		UI.style_button(btn_eng, "slate", 8, 3, 3)
+		UI.style_button(btn_brief, "tab_active", 8, 3, 3)
+	)
+	btn_hide.pressed.connect(func():
+		_right_dock.visible = not _right_dock.visible
+	)
+
+	var stage_pill := PanelContainer.new()
+	stage_pill.add_theme_stylebox_override("panel", UI.metallic_panel(Color("1c2e42"), UI.KSP_AMBER, 4, 5))
+	bottom_right.add_child(stage_pill)
+	_stage_dv_badge = Label.new()
+	_stage_dv_badge.text = "0 m/s"
+	_stage_dv_badge.add_theme_font_size_override("font_size", 13)
+	_stage_dv_badge.add_theme_color_override("font_color", UI.KSP_CYAN)
+	stage_pill.add_child(_stage_dv_badge)
+
+func _set_category_filter(cat_id: String) -> void:
+	_active_category_filter = cat_id
+	for k in _cat_rail_buttons:
+		UI.style_button(_cat_rail_buttons[k], "tab_active" if k == cat_id else "slate", 2, 2, 3)
+	_refresh_parts()
 
 func _make_world() -> void:
 	var viewport: SubViewport = _viewport_container.get_child(0)
@@ -227,27 +476,21 @@ func _make_world() -> void:
 	var env := WorldEnvironment.new()
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("111721")
+	environment.background_color = Color("2a3038")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("b4c2d9")
-	environment.ambient_light_energy = 0.7
+	environment.ambient_light_color = Color("cfd8e3")
+	environment.ambient_light_energy = 0.78
+	MODEL_LIBRARY.use_sky_reflections(environment)
 	env.environment = environment
 	world.add_child(env)
 	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-50, -30, 0)
+	light.rotation_degrees = Vector3(-48, -32, 0)
+	light.light_energy = 1.05
 	world.add_child(light)
-	var grid := ImmediateMesh.new()
-	grid.surface_begin(Mesh.PRIMITIVE_LINES)
-	for i in range(-10, 11):
-		grid.surface_add_vertex(Vector3(i, -1.5, -10))
-		grid.surface_add_vertex(Vector3(i, -1.5, 10))
-		grid.surface_add_vertex(Vector3(-10, -1.5, i))
-		grid.surface_add_vertex(Vector3(10, -1.5, i))
-	grid.surface_end()
-	var grid_node := MeshInstance3D.new()
-	grid_node.mesh = grid
-	grid_node.material_override = _material(Color("344556"))
-	world.add_child(grid_node)
+
+	# Build full 3D VAB Assembly Warehouse around the central spacecraft stand
+	WAREHOUSE.populate_warehouse(world, str(launcher.get("id", "launcher_electron")))
+
 	_camera = Camera3D.new()
 	_camera.current = true
 	world.add_child(_camera)
@@ -256,13 +499,21 @@ func _make_world() -> void:
 	_craft = Node3D.new()
 	_craft.scale = Vector3.ONE * (2.0 / maxf(_dimensions.x, maxf(_dimensions.y, _dimensions.z)))
 	world.add_child(_craft)
+	_attachments = Node3D.new()
+	_attachments.name = "Attachments"
+	var model := MODEL_LIBRARY.instantiate("buses", bus.id)
+	if model:
+		model.name = "Bus"
+		_craft.add_child(model)
+		_craft.add_child(_attachments)
+		_mounts = SPACECRAFT.mounts_of(model)
+		_reset_camera()
+		return
 	var box := CSGBox3D.new()
 	box.name = "Bus"
 	box.size = _dimensions
 	box.material = _material(Color("d5d9de"))
 	_craft.add_child(box)
-	_attachments = Node3D.new()
-	_attachments.name = "Attachments"
 	_craft.add_child(_attachments)
 	for marker in {"mount_top": Vector3(0, _dimensions.y/2, 0), "mount_bottom": Vector3(0, -_dimensions.y/2, 0), "mount_front": Vector3(0, 0, -_dimensions.z/2), "mount_back": Vector3(0, 0, _dimensions.z/2), "mount_left": Vector3(-_dimensions.x/2, 0, 0), "mount_right": Vector3(_dimensions.x/2, 0, 0), "array_hinge_left": Vector3(-_dimensions.x/2, 0, 0), "array_hinge_right": Vector3(_dimensions.x/2, 0, 0), "engine_mount": Vector3(0, -_dimensions.y/2, 0)}:
 		var point := Marker3D.new()
@@ -279,6 +530,7 @@ func _make_world() -> void:
 		elif marker in ["mount_right", "array_hinge_right"]:
 			point.rotation.z = -PI / 2.0
 		_craft.add_child(point)
+		_mounts[marker] = point
 	_reset_camera()
 
 func _material(color: Color) -> StandardMaterial3D:
@@ -301,24 +553,74 @@ func _refresh_parts() -> void:
 		child.queue_free()
 	_engine_buttons.clear()
 	var groups: Dictionary = GlobalData.parts_by_subsystem(true)
+	var req_ids: Array = mission.get("requiredPartIds", [])
 	for category in CATEGORIES:
+		if _active_category_filter != "all" and category != _active_category_filter:
+			continue
 		if not groups.has(category):
 			continue
-		var toggle := Button.new()
-		toggle.text = category.to_upper() + " [show/hide]"
-		toggle.toggle_mode = true
-		toggle.button_pressed = true
-		_category_container.add_child(toggle)
-		var entries := VBoxContainer.new()
-		_category_container.add_child(entries)
-		toggle.toggled.connect(func(on: bool): entries.visible = on)
+		var matching_parts: Array[Dictionary] = []
 		for part: Dictionary in groups[category]:
+			if not _part_search_query.is_empty():
+				var hay := (str(part.name) + " " + str(part.subsystem) + " " + str(part.heritage)).to_lower()
+				if not hay.contains(_part_search_query):
+					continue
+			matching_parts.append(part)
+		if matching_parts.is_empty():
+			continue
+
+		var cat_hdr := Label.new()
+		cat_hdr.text = "▾ " + category.to_upper()
+		cat_hdr.add_theme_font_size_override("font_size", 13)
+		cat_hdr.add_theme_color_override("font_color", UI.KSP_AMBER)
+		_category_container.add_child(cat_hdr)
+
+		for part: Dictionary in matching_parts:
 			var button := Button.new()
-			button.text = "%s\n%.2f kg · +%.1f/−%.1f W · $%.2fM" % [part.name, part.massKg, part.powerGenWatts, part.powerDrawWatts, part.costMillions]
-			button.tooltip_text = part.heritage
-			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.custom_minimum_size.y = 58
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var is_req: bool = part.id in req_ids
+			UI.style_button(button, "tile_selected" if is_req else "tile", 6, 4, 3)
+			button.tooltip_text = "%s\nMass: %.2f kg  |  Volume: %.2f L\nPower: +%.1f W / -%.1f W  |  Cost: $%.2fM\n%s" % [
+				part.name, part.massKg, part.volumeLiters, part.powerGenWatts, part.powerDrawWatts, part.costMillions, part.heritage
+			]
 			button.pressed.connect(add_part.bind(part.id))
-			entries.add_child(button)
+
+			var row := HBoxContainer.new()
+			row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			row.offset_left = 6
+			row.offset_right = -6
+			row.offset_top = 4
+			row.offset_bottom = -4
+			row.add_theme_constant_override("separation", 8)
+			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			button.add_child(row)
+
+			row.add_child(UI.part_preview(part, Vector2(44, 44)))
+
+			var txt_col := VBoxContainer.new()
+			txt_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			txt_col.alignment = BoxContainer.ALIGNMENT_CENTER
+			txt_col.add_theme_constant_override("separation", 2)
+			txt_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(txt_col)
+
+			var nm := Label.new()
+			nm.text = str(part.name) + (" ★" if is_req else "")
+			nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			nm.add_theme_font_size_override("font_size", 13)
+			nm.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT if is_req else UI.WHITE)
+			nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			txt_col.add_child(nm)
+
+			var specs := Label.new()
+			specs.text = "%.2f kg · +%.0f/-%.1fW · $%.2fM" % [part.massKg, part.powerGenWatts, part.powerDrawWatts, part.costMillions]
+			specs.add_theme_font_size_override("font_size", 11)
+			specs.add_theme_color_override("font_color", UI.MUTED)
+			specs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			txt_col.add_child(specs)
+
+			_category_container.add_child(button)
 			if part.get("thrustNewtons", 0.0) > 0.0:
 				button.disabled = not _engine().is_empty()
 				_engine_buttons.append(button)
@@ -413,24 +715,31 @@ func _refresh_build() -> void:
 		if indices.is_empty(): continue
 		var heading := Label.new()
 		heading.text = category.to_upper().replace("_", " ")
-		heading.add_theme_color_override("font_color", Color("279af1"))
+		heading.add_theme_font_size_override("font_size", 12)
+		heading.add_theme_color_override("font_color", UI.KSP_CYAN)
 		_installed_container.add_child(heading)
 		for index in indices:
 			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 6)
 			_installed_container.add_child(row)
 			var label := Label.new()
 			label.text = installed_components[index].name
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			label.add_theme_font_size_override("font_size", 13)
 			row.add_child(label)
 			var remove := Button.new()
-			remove.text = "Remove"
+			remove.text = "×"
+			remove.tooltip_text = "Remove " + str(installed_components[index].name)
+			remove.add_theme_font_size_override("font_size", 13)
+			UI.style_button(remove, "red", 7, 2, 3)
 			remove.pressed.connect(remove_part.bind(index))
 			row.add_child(remove)
 	for child in _attachments.get_children():
 		child.queue_free()
 	_visuals.clear()
 	var wing := 0
+	var occupied := {}
 	for i in installed_components.size():
 		var part := installed_components[i]
 		var visual := Node3D.new()
@@ -438,6 +747,11 @@ func _refresh_build() -> void:
 		_attachments.add_child(visual)
 		_visuals.append(visual)
 		var d := _dimensions
+		var models := SPACECRAFT.place_part(part, _mounts, occupied, d)
+		for instance in models:
+			visual.add_child(instance)
+		if not models.is_empty():
+			continue
 		if part.id == "pwr_gomspace_p31u":
 			_box(visual, Vector3(d.x*0.85,d.y*0.85,d.z*0.03), Vector3(0,0,-d.z*0.52), Color("173f79"))
 			_box(visual, Vector3(d.x*0.85,d.y*0.85,d.z*0.03), Vector3(0,0,d.z*0.52), Color("173f79"))
@@ -456,8 +770,8 @@ func _refresh_build() -> void:
 			nozzle.material_override = _material(Color("515e68"))
 			visual.add_child(nozzle)
 		elif part.subsystem == "landing" and part.id == "land_hex_gear":
-			for x in [-1,1]:
-				for z in [-1,1]:
+			for x: int in [-1,1]:
+				for z: int in [-1,1]:
 					_box(visual, Vector3(d.x*0.06,d.y*0.4,d.z*0.06), Vector3(x*d.x*0.4,-d.y*0.7,z*d.z*0.4), Color("aab5be"))
 					visual.get_child(visual.get_child_count() - 1).rotation.z = x * 0.3
 		elif part.subsystem == "comms":
@@ -478,11 +792,11 @@ func _viewport_input(event: InputEvent) -> void:
 			if event.pressed:
 				_viewport_container.grab_focus()
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.5, 12.0)
+			_distance = clampf(_distance * (0.9 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.5, 11.5)
 			_update_camera()
 	elif event is InputEventMouseMotion and _dragging:
 		_yaw -= event.relative.x * 0.01
-		_pitch = clampf(_pitch + event.relative.y * 0.01, -1.35, 1.35)
+		_pitch = clampf(_pitch + event.relative.y * 0.01, -0.22, 1.18)
 		_update_camera()
 	elif event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -493,8 +807,8 @@ func _viewport_input(event: InputEvent) -> void:
 			KEY_PLUS, KEY_EQUAL, KEY_KP_ADD: _distance *= 0.9
 			KEY_MINUS, KEY_KP_SUBTRACT: _distance *= 1.1
 			_: return
-		_pitch = clampf(_pitch, -1.35, 1.35)
-		_distance = clampf(_distance, 2.5, 12.0)
+		_pitch = clampf(_pitch, -0.22, 1.18)
+		_distance = clampf(_distance, 2.5, 11.5)
 		_update_camera()
 
 func _input(event: InputEvent) -> void:
@@ -502,13 +816,15 @@ func _input(event: InputEvent) -> void:
 		_dragging = false
 
 func _update_camera() -> void:
-	_camera.position = Vector3(sin(_yaw)*cos(_pitch), sin(_pitch), cos(_yaw)*cos(_pitch)) * _distance
+	var raw := Vector3(sin(_yaw)*cos(_pitch), sin(_pitch), cos(_yaw)*cos(_pitch)) * _distance
+	raw.y = maxf(raw.y, WAREHOUSE.FLOOR_Y + 0.55)
+	_camera.position = raw
 	_camera.look_at(Vector3.ZERO, Vector3.UP)
 
 func _reset_camera() -> void:
-	_yaw = 0.6
-	_pitch = 0.35
-	_distance = 5.0
+	_yaw = 0.42
+	_pitch = 0.34
+	_distance = 5.6
 	_update_camera()
 
 func _back() -> void:
@@ -524,16 +840,27 @@ func _update_readiness() -> void:
 	review = _stats_helper.run_readiness_review(build, mission)
 	_launch.disabled = _has_failures()
 	_notice.text = ""
+
+	if _cost_readout_label:
+		_cost_readout_label.text = "√ Cost: $%.2fM (%06d)" % [stats.cost_millions, int(round(stats.cost_millions * 1000.0))]
+		_cost_readout_label.add_theme_color_override("font_color", UI.ORANGE if stats.cost_millions > stats.budget_millions else UI.GOLD)
+	if _budget_readout_label:
+		_budget_readout_label.text = "√ Cap:  $%.2fM  |  Parts: %d" % [stats.budget_millions, installed_components.size()]
+	if _stage_dv_badge:
+		_stage_dv_badge.text = "STAGE 0   |   %.0f m/s Δv   |   %s" % [stats.delta_v_mps, "READY" if not _has_failures() else "CHECK"]
+
 	for child in _telemetry.get_children():
 		child.queue_free()
 	var endurance := "No load" if is_inf(stats.endurance_minutes) else "%.1f min" % stats.endurance_minutes
 	if mission.get("targetOrbit", "") == "SSO":
 		var capacity := Label.new()
 		capacity.text = "SSO capacity: %.0f kg" % stats.launcher_capacity_kg
+		capacity.add_theme_font_size_override("font_size", 12)
 		_telemetry.add_child(capacity)
 	elif mission.get("targetOrbit", "") in ["GEO", "GTO"]:
 		var capacity := Label.new()
 		capacity.text = "GTO capacity: %.0f kg" % stats.launcher_capacity_kg
+		capacity.add_theme_font_size_override("font_size", 12)
 		_telemetry.add_child(capacity)
 	_add_telemetry("Mass", "%.2f / %.2f kg (%.1f%% margin)" % [stats.wet_mass_kg, stats.launcher_capacity_kg, stats.mass_margin_pct], stats.wet_mass_kg, stats.launcher_capacity_kg * 0.9, "Mass budget")
 	_add_telemetry("Volume", "%.2f / %.2f L" % [stats.internal_volume_liters, stats.volume_capacity_liters], stats.internal_volume_liters, stats.volume_capacity_liters, "Volume")
@@ -546,17 +873,18 @@ func _add_telemetry(title: String, text: String, used: float, limit: float, chec
 	var status := "PASS"
 	for item in review:
 		if item.check == check_name: status = item.status
-	var color := Color("ff8811") if status == "FAIL" else (Color("ff8811") if status == "ADVISORY" or (is_finite(limit) and limit > 0.0 and used >= limit * 0.9) else Color("279af1"))
+	var color := Color("ff8811") if status == "FAIL" else (Color("f5b942") if status == "ADVISORY" or (is_finite(limit) and limit > 0.0 and used >= limit * 0.9) else UI.KSP_GREEN_TEXT)
 	var label := Label.new()
 	label.text = title + ": " + text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", color)
 	_telemetry.add_child(label)
 	var bar := ProgressBar.new()
 	bar.max_value = 100
 	bar.value = clampf(used / limit * 100.0, 0.0, 100.0) if is_finite(limit) and limit > 0 else 0.0
 	bar.show_percentage = false
-	bar.custom_minimum_size.y = 8
+	bar.custom_minimum_size.y = 7
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = color
 	bar.add_theme_stylebox_override("fill", fill)
@@ -576,7 +904,7 @@ func _show_review() -> void:
 		label.text = "%s — %s: %s" % [item.status, item.check, item.message]
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = 600
-		label.add_theme_color_override("font_color", Color("ff8811") if item.status == "FAIL" else (Color("ff8811") if item.status == "ADVISORY" else Color("279af1")))
+		label.add_theme_color_override("font_color", Color("ff8811") if item.status == "FAIL" else (Color("ff8811") if item.status == "ADVISORY" else UI.KSP_GREEN_TEXT))
 		container.add_child(label)
 	dialog.close_requested.connect(dialog.queue_free)
 	dialog.confirmed.connect(dialog.queue_free)

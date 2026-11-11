@@ -10,7 +10,18 @@
     "capacityLeoKg": 300,
     "capacityGtoKg": 0,
     "capacityTliKg": 0,
-    "heritage": "Electron is Rocket Lab’s small-satellite launch vehicle."
+    "heritage": "Electron is Rocket Lab’s small-satellite launch vehicle.",
+    "ascent": {
+      "diameterMeters": 1.2,
+      "fairingMassKg": 50,
+      "pitchKickDeg": 3.5,
+      "stagingCoastSeconds": 3,
+      "siteRotationMps": 360,
+      "stages": [
+        {"thrustSeaLevelN": 192000, "thrustVacuumN": 224000, "ispVacuumS": 311, "propellantKg": 9800, "dryMassKg": 950},
+        {"thrustVacuumN": 32000, "ispVacuumS": 343, "propellantKg": 3300, "dryMassKg": 320}
+      ]
+    }
   },
   {
     "id": "launcher_vega_c",
@@ -23,7 +34,18 @@
     "capacityLeoKg": 2300,
     "capacityGtoKg": 1000,
     "capacityTliKg": 500,
-    "heritage": "Vega-C and PSLV are medium-class launch vehicles represented together for gameplay."
+    "heritage": "Vega-C and PSLV are medium-class launch vehicles represented together for gameplay.",
+    "ascent": {
+      "diameterMeters": 3.4,
+      "fairingMassKg": 860,
+      "pitchKickDeg": 3.0,
+      "stagingCoastSeconds": 5,
+      "siteRotationMps": 463,
+      "stages": [
+        {"thrustSeaLevelN": 4100000, "thrustVacuumN": 4500000, "ispVacuumS": 279, "propellantKg": 142000, "dryMassKg": 11000},
+        {"thrustVacuumN": 650000, "ispVacuumS": 295, "propellantKg": 47000, "dryMassKg": 6500}
+      ]
+    }
   },
   {
     "id": "launcher_falcon_9",
@@ -36,6 +58,17 @@
     "capacityLeoKg": 17500,
     "capacityGtoKg": 5500,
     "capacityTliKg": 3800,
-    "heritage": "Falcon 9 launched Bangladesh Satellite-1 in 2018."
+    "heritage": "Falcon 9 launched Bangladesh Satellite-1 in 2018.",
+    "ascent": {
+      "diameterMeters": 3.7,
+      "fairingMassKg": 1900,
+      "pitchKickDeg": 3.0,
+      "stagingCoastSeconds": 8,
+      "siteRotationMps": 409,
+      "stages": [
+        {"thrustSeaLevelN": 7607000, "thrustVacuumN": 8227000, "ispVacuumS": 311, "propellantKg": 395700, "dryMassKg": 25600},
+        {"thrustVacuumN": 981000, "ispVacuumS": 348, "propellantKg": 107500, "dryMassKg": 4000}
+      ]
+    }
   }
 ]

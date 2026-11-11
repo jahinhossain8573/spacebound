@@ -44,7 +44,7 @@ func run_tests() -> void:
 	root.add_child(launch)
 	launch.set_process(false)
 	launch.ignite()
-	launch.advance_ascent(15.0)
+	launch.advance_ascent(launch.ascent_duration)
 	var flight = launch._flight
 	flight.set_process(false)
 	check(em.blocking and em._active.id == "E9", "Cloud event occurs on live arrival without skipping")

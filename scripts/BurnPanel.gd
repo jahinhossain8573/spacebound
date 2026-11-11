@@ -1,5 +1,7 @@
 extends VBoxContainer
 
+const UI = preload("res://scripts/UIStyle.gd")
+
 var flight: Control
 var engine: Dictionary = {}
 var fuel_kg := 0.0
@@ -15,6 +17,7 @@ var _last_burn: Dictionary = {}
 
 func setup(owner_flight: Control) -> void:
 	flight = owner_flight
+	add_theme_constant_override("separation", 5)
 	var build: Dictionary = GameManager.current_build
 	for part in build.get("installed_components", []):
 		if part.get("thrustNewtons", 0.0) > 0 and part.get("ispSeconds", 0.0) > engine.get("ispSeconds", 0.0): engine = part
@@ -22,12 +25,15 @@ func setup(owner_flight: Control) -> void:
 	flight.remaining_propellant_kg = fuel_kg
 	if not build.is_empty(): dry_kg = preload("res://scripts/BuildStats.gd").new().calculate_stats(build, flight.mission).dry_mass_kg
 	var title := Label.new()
-	title.text = "ORBITAL BURN"
+	title.text = "MANEUVER / ORBITAL BURN"
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", UI.KSP_CYAN)
 	add_child(title)
 	var controls := HBoxContainer.new()
+	controls.add_theme_constant_override("separation", 6)
 	add_child(controls)
 	_value = SpinBox.new()
-	_value.custom_minimum_size.x = 130
+	_value.custom_minimum_size.x = 120
 	_value.step = 1
 	# Commit the full typed value before refreshing the prediction.
 	_value.update_on_text_changed = false
@@ -37,22 +43,36 @@ func setup(owner_flight: Control) -> void:
 	_direction = OptionButton.new()
 	_direction.add_item("Prograde")
 	_direction.add_item("Retrograde")
+	_direction.add_theme_font_size_override("font_size", 13)
 	_direction.item_selected.connect(func(_i): refresh())
 	controls.add_child(_direction)
 	_execute = Button.new()
 	_execute.text = "Execute burn"
+	_execute.add_theme_font_size_override("font_size", 13)
+	UI.style_button(_execute, "amber", 8, 4, 3)
 	_execute.pressed.connect(_on_execute)
 	controls.add_child(_execute)
+	var apsis_row := HBoxContainer.new()
+	apsis_row.add_theme_constant_override("separation", 6)
+	add_child(apsis_row)
 	_apo = Button.new()
 	_apo.text = "Wait for apoapsis"
+	_apo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apo.add_theme_font_size_override("font_size", 12)
+	UI.style_button(_apo, "slate", 8, 4, 3)
 	_apo.pressed.connect(func(): flight.wait_for_apsis(true))
-	controls.add_child(_apo)
+	apsis_row.add_child(_apo)
 	_peri = Button.new()
 	_peri.text = "Wait for periapsis"
+	_peri.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_peri.add_theme_font_size_override("font_size", 12)
+	UI.style_button(_peri, "slate", 8, 4, 3)
 	_peri.pressed.connect(func(): flight.wait_for_apsis(false))
-	controls.add_child(_peri)
+	apsis_row.add_child(_peri)
 	_info = Label.new()
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_info.add_theme_font_size_override("font_size", 12)
+	_info.add_theme_color_override("font_color", UI.MUTED)
 	add_child(_info)
 	refresh()
 
@@ -70,7 +90,7 @@ func refresh() -> void:
 	elif result.has("orbit"):
 		var o: OrbitState = result.orbit
 		prediction = "Periapsis %.0f km / apoapsis %.0f km" % [o.semi_major_axis_km * (1.0-o.eccentricity) - FlightSim.R_EARTH_KM, o.semi_major_axis_km * (1.0+o.eccentricity) - FlightSim.R_EARTH_KM]
-	_info.text = "No propulsion installed" if engine.is_empty() else "Fuel %.2f kg  |  Available Δv %.1f m/s  |  Burn %.1f s  |  %s" % [fuel_kg, available, FlightSim.burn_duration_s(dry_kg + fuel_kg, amount, engine.ispSeconds, engine.thrustNewtons), prediction]
+	_info.text = "No propulsion installed" if engine.is_empty() else "Fuel %.2f kg  |  Available Δv %.1f m/s  |  Burn %.1f s\n%s" % [fuel_kg, available, FlightSim.burn_duration_s(dry_kg + fuel_kg, amount, engine.ispSeconds, engine.thrustNewtons), prediction]
 	_execute.disabled = _busy or engine.is_empty() or amount <= 0.0 or not result.has("orbit") or flight.power_failed or flight.mission_finished or not flight._skip_result.is_empty() or flight._wait_target >= 0.0
 	_apo.disabled = _busy or flight.orbit.eccentricity < 0.001 or flight._wait_target >= 0.0 or flight.power_failed or flight.mission_finished
 	_peri.disabled = _apo.disabled
@@ -114,12 +134,13 @@ func _on_execute() -> void:
 	if execute_burn(amount, retrograde):
 		var flame := MeshInstance3D.new()
 		var mesh := CylinderMesh.new()
-		var scale_factor: float = flight.shared_launch.rocket_height if shared else 0.03
-		mesh.top_radius = scale_factor * 0.015
+		var scale_factor: float = flight.shared_launch.spacecraft_size() if shared else 0.03
+		var spacecraft: bool = shared and flight.shared_launch.payload_separated()
+		mesh.top_radius = scale_factor * (0.15 if spacecraft else 0.015)
 		mesh.bottom_radius = 0.0
-		mesh.height = scale_factor * 0.15
+		mesh.height = scale_factor * (1.0 if spacecraft else 0.15)
 		flame.mesh = mesh
-		flame.position.y = scale_factor * (0.42 if shared else -0.15)
+		flame.position.y = flight.shared_launch.focus_height - scale_factor if spacecraft else scale_factor * (0.42 if shared else -0.15)
 		var material := StandardMaterial3D.new()
 		material.albedo_color = Color("ffb300")
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

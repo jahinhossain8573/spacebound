@@ -59,7 +59,7 @@ func run_tests() -> void:
 	root.add_child(launch)
 	launch.set_process(false)
 	launch.ignite()
-	launch.advance_ascent(15.0)
+	launch.advance_ascent(launch.ascent_duration)
 	var flight = launch._flight
 	flight.set_process(false)
 	check(gm.last_result.objectives.size() == 4 and gm.last_result.objectives[0].done and gm.last_result.objectives[2].done, "launch and downlink objectives")
