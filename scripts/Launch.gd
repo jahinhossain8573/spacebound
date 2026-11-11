@@ -1,5 +1,6 @@
 extends Control
 
+const LAUNCH_BREAKUP := preload("res://scripts/LaunchBreakup.gd")
 const MISSION_OBJECTIVES = preload("res://scripts/MissionObjectives.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
@@ -53,7 +54,7 @@ var _stage1_flame: LAUNCH_PLUME
 var _upper_flame: LAUNCH_PLUME
 var _payload: Node3D
 var _camera: Camera3D
-var _flash: MeshInstance3D
+var _failure_effect: LAUNCH_BREAKUP
 var _status: Label
 var _skip: Button
 var _start: Button
@@ -316,14 +317,6 @@ func _create_world() -> void:
 		_assemble_model_rocket(model, build)
 	else:
 		_assemble_primitive_rocket(build)
-	_flash = MeshInstance3D.new()
-	var flash_mesh := SphereMesh.new()
-	flash_mesh.radius = rocket_height * 0.045
-	flash_mesh.height = rocket_height * 0.09
-	_flash.mesh = flash_mesh
-	_flash.material_override = _material(Color("ffb300"), true)
-	_flash.visible = false
-	_root3d.add_child(_flash)
 	_camera = Camera3D.new()
 	_camera.current = true
 	_camera.near = 0.5
@@ -495,7 +488,8 @@ func _process(delta: float) -> void:
 		return
 	if _failure_timer > 0.0:
 		_failure_timer -= delta
-		_flash.scale = Vector3.ONE * (1.0 + (3.0 - _failure_timer) * 2.0)
+		_failure_effect.advance(delta)
+		_update_camera()
 		if _failure_timer <= 0.0:
 			_finish_failure()
 		return
@@ -735,17 +729,36 @@ func skip_ascent() -> void:
 	advance_ascent(LIVE_ASCENT.MAX_FLIGHT_S + 1.0)
 
 func _explode(reason := "") -> void:
+	if _failure_effect != null:
+		return
 	_status.text = "LAUNCH FAILURE"
 	_warning.text = reason
 	_hud_overlay.sync_banners()
 	_start.disabled = true
 	_status.add_theme_color_override("font_color", Color("ff8811"))
-	_flash.position = _rocket.position
-	_flash.visible = true
+	var grounded := _ascent.altitude < rocket_height * 0.5
+	var frame := local_frame()
+	var center := _rocket.transform * (Vector3.UP * (rocket_height * 0.42))
+	if grounded:
+		center = _rocket.position + frame.y * (rocket_height * 0.23 + maxf(0.0, -_ascent.altitude))
+		_camera_pitch = maxf(0.12, _camera_pitch)
+	var motion := frame.inverse() * Vector3(_ascent.vx, _ascent.vy, 0.0)
+	motion.x -= _ground_speed
+	_failure_effect = LAUNCH_BREAKUP.new()
+	_failure_effect.transform = Transform3D(frame, center)
+	_root3d.add_child(_failure_effect)
+	_failure_effect.setup(rocket_height, _ascent.altitude, motion.limit_length(rocket_height * 0.62), grounded)
+	if _map_view:
+		toggle_map_view()
+	create_tween().tween_property(self, "_camera_distance", clampf(_camera_distance, 2.4, 3.6), 0.45).set_ease(Tween.EASE_OUT)
+	_stage1_flame.update_thrust(0.0, _ascent.altitude)
+	if _upper_flame:
+		_upper_flame.update_thrust(0.0, _ascent.altitude)
 	_rocket.visible = false
 	SPACE_CENTER.set_pad_exhaust(_pad_rig, false)
 	_skip.disabled = true
-	_failure_timer = 3.0
+	_failure_timer = LAUNCH_BREAKUP.DURATION
+	_update_camera()
 	_log("Launch vehicle failure." if reason.is_empty() else reason)
 
 func _finish_failure() -> void:
@@ -806,6 +819,8 @@ func _log(message: String, at: float = -1.0) -> void:
 	GameManager.last_result.flight_log.append("T+%s %s" % [_clock(_sim_time if at < 0 else at), message])
 
 func focus_point() -> Vector3:
+	if _failure_effect != null:
+		return _failure_effect.position
 	return _rocket.transform * Vector3(0, focus_height, 0)
 
 ## Moves the craft to a position in metres from Earth's centre (launch site starts on +Y) and
