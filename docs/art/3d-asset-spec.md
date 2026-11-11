@@ -51,6 +51,8 @@ An asset may use a material outside the library when nothing in it fits, such as
   | Buses, vehicles | 1024 px |
   | Rockets, environment | 2048 px |
 
+  Vega-C's full-length livery uses a 4096 × 4096 px texture to keep the markings legible in close-up.
+
 - **Triangle budgets:** the upper limits are enforced. The lower numbers are guidance; a simple part may be smaller.
 
   | Asset | Triangles |
