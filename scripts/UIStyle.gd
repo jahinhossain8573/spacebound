@@ -197,7 +197,7 @@ static func build_agency_bar(left_tabs: Array = []) -> Dictionary:
 	for t in left_tabs:
 		var tb := Button.new()
 		tb.text = str(t)
-		tb.add_theme_font_size_override("font_size", 15)
+		tb.add_theme_font_size_override("font_size", 18)
 		style_button(tb, "tab_active" if tab_buttons.is_empty() else "tab_inactive", 10, 4, 3)
 		left_box.add_child(tb)
 		tab_buttons.append(tb)
@@ -208,7 +208,7 @@ static func build_agency_bar(left_tabs: Array = []) -> Dictionary:
 	var time_label := Label.new()
 	var day_num := 1 + GameManager.completed_missions.size() * 12
 	time_label.text = "Year 1, Day %d - 0h, 0m" % day_num
-	time_label.add_theme_font_size_override("font_size", 14)
+	time_label.add_theme_font_size_override("font_size", 17)
 	time_label.add_theme_color_override("font_color", Color("cfd6df"))
 	clock_well.add_child(time_label)
 
@@ -232,7 +232,7 @@ static func build_agency_bar(left_tabs: Array = []) -> Dictionary:
 	funds_well.add_child(funds_row)
 	funds_row.add_child(icon("funds", Vector2(18, 18), KSP_GREEN_TEXT))
 	var funds_label := Label.new()
-	funds_label.add_theme_font_size_override("font_size", 17)
+	funds_label.add_theme_font_size_override("font_size", 20)
 	funds_label.add_theme_color_override("font_color", KSP_GREEN_TEXT)
 	funds_row.add_child(funds_label)
 
@@ -257,7 +257,7 @@ static func build_agency_bar(left_tabs: Array = []) -> Dictionary:
 	sci_well.add_child(sci_row)
 	sci_row.add_child(icon("science", Vector2(18, 18), KSP_CYAN))
 	var science_label := Label.new()
-	science_label.add_theme_font_size_override("font_size", 17)
+	science_label.add_theme_font_size_override("font_size", 20)
 	science_label.add_theme_color_override("font_color", KSP_CYAN)
 	sci_row.add_child(science_label)
 

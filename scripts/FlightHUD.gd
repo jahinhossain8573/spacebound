@@ -78,7 +78,7 @@ func _build_top_left() -> void:
 
 	back_button = Button.new()
 	back_button.text = "< Mission Select" if mode == "launch" else "< Back"
-	back_button.add_theme_font_size_override("font_size", 14)
+	back_button.add_theme_font_size_override("font_size", 17)
 	UI.style_button(back_button, "amber", 8, 3, 3)
 	row.add_child(back_button)
 
@@ -87,13 +87,13 @@ func _build_top_left() -> void:
 	row.add_child(met_well)
 	met_label = Label.new()
 	met_label.text = "T+ 0y, 0d, 00:00:00"
-	met_label.add_theme_font_size_override("font_size", 15)
+	met_label.add_theme_font_size_override("font_size", 18)
 	met_label.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	met_well.add_child(met_label)
 
 	var met_tag := Label.new()
 	met_tag.text = "MET"
-	met_tag.add_theme_font_size_override("font_size", 13)
+	met_tag.add_theme_font_size_override("font_size", 16)
 	met_tag.add_theme_color_override("font_color", UI.MUTED)
 	row.add_child(met_tag)
 
@@ -101,7 +101,7 @@ func _build_top_left() -> void:
 
 	sun_badge = Label.new()
 	sun_badge.text = "PAD" if mode == "launch" else "SUNLIGHT"
-	sun_badge.add_theme_font_size_override("font_size", 13)
+	sun_badge.add_theme_font_size_override("font_size", 16)
 	sun_badge.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	row.add_child(sun_badge)
 
@@ -117,7 +117,7 @@ func _build_top_left() -> void:
 		wrap.add_child(aero_pod)
 		aero_label = Label.new()
 		aero_label.text = "TWR 0.00  ·  Mach 0.00  ·  Q 0.0 kPa  ·  1.0 G"
-		aero_label.add_theme_font_size_override("font_size", 12)
+		aero_label.add_theme_font_size_override("font_size", 14)
 		aero_label.add_theme_color_override("font_color", UI.KSP_CYAN)
 		aero_pod.add_child(aero_label)
 
@@ -157,7 +157,7 @@ func _build_top_center() -> void:
 	digit_row.add_child(mode_tag)
 	var sea_lbl := Label.new()
 	sea_lbl.text = "ASL"
-	sea_lbl.add_theme_font_size_override("font_size", 11)
+	sea_lbl.add_theme_font_size_override("font_size", 13)
 	sea_lbl.add_theme_color_override("font_color", UI.KSP_CYAN)
 	mode_tag.add_child(sea_lbl)
 
@@ -170,7 +170,7 @@ func _build_top_center() -> void:
 		dl.text = "0"
 		dl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		dl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		dl.add_theme_font_size_override("font_size", 20)
+		dl.add_theme_font_size_override("font_size", 24)
 		dl.add_theme_color_override("font_color", UI.WHITE)
 		cell.add_child(dl)
 		alt_digits.append(dl)
@@ -182,7 +182,7 @@ func _build_top_center() -> void:
 	alt_unit_label = Label.new()
 	alt_unit_label.text = "m"
 	alt_unit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	alt_unit_label.add_theme_font_size_override("font_size", 16)
+	alt_unit_label.add_theme_font_size_override("font_size", 19)
 	alt_unit_label.add_theme_color_override("font_color", UI.KSP_AMBER)
 	unit_cell.add_child(alt_unit_label)
 
@@ -198,7 +198,7 @@ func _build_top_center() -> void:
 
 	# Compact telemetry readout banner below altimeter
 	var status_panel := PanelContainer.new()
-	status_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	status_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	status_panel.add_theme_stylebox_override("panel", UI.inset_well(Color(0.06, 0.08, 0.11, 0.82), Color("364252"), 3, 5))
 	anchor.add_child(status_panel)
@@ -210,27 +210,29 @@ func _build_top_center() -> void:
 
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 14)
+	status_label.add_theme_font_size_override("font_size", 17)
 	status_label.add_theme_color_override("font_color", UI.KSP_CYAN)
 	status_col.add_child(status_label)
 
 	beacon_label = Label.new()
 	beacon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	beacon_label.add_theme_font_size_override("font_size", 14)
+	beacon_label.add_theme_font_size_override("font_size", 17)
 	beacon_label.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	beacon_label.visible = false
 	status_col.add_child(beacon_label)
 
 	warning_label = Label.new()
+	warning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	warning_label.add_theme_font_size_override("font_size", 14)
+	warning_label.add_theme_font_size_override("font_size", 17)
 	warning_label.add_theme_color_override("font_color", UI.ORANGE)
 	warning_label.visible = false
 	status_col.add_child(warning_label)
 
 	error_label = Label.new()
+	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	error_label.add_theme_font_size_override("font_size", 14)
+	error_label.add_theme_font_size_override("font_size", 17)
 	error_label.add_theme_color_override("font_color", UI.ORANGE)
 	error_label.visible = false
 	status_col.add_child(error_label)
@@ -247,6 +249,7 @@ func _build_top_right() -> void:
 	hbox.anchor_right = 1.0
 	hbox.offset_left = -430
 	hbox.offset_right = -6
+	hbox.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	hbox.offset_top = 6
 	hbox.alignment = BoxContainer.ALIGNMENT_END
 	hbox.add_theme_constant_override("separation", 6)
@@ -269,16 +272,16 @@ func _build_top_right() -> void:
 	objectives_drawer.add_child(obj_col)
 	var obj_hdr := Label.new()
 	obj_hdr.text = "CONTRACT OBJECTIVES"
-	obj_hdr.add_theme_font_size_override("font_size", 13)
+	obj_hdr.add_theme_font_size_override("font_size", 16)
 	obj_hdr.add_theme_color_override("font_color", UI.KSP_AMBER)
 	obj_col.add_child(obj_hdr)
 	objective_label = Label.new()
 	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_label.add_theme_font_size_override("font_size", 14)
+	objective_label.add_theme_font_size_override("font_size", 17)
 	obj_col.add_child(objective_label)
 	images_label = Label.new()
 	images_label.visible = false
-	images_label.add_theme_font_size_override("font_size", 14)
+	images_label.add_theme_font_size_override("font_size", 17)
 	images_label.add_theme_color_override("font_color", UI.KSP_CYAN)
 	obj_col.add_child(images_label)
 
@@ -292,11 +295,11 @@ func _build_top_right() -> void:
 	power_drawer.add_child(pwr_col)
 	var pwr_hdr := Label.new()
 	pwr_hdr.text = "ELECTRIC CHARGE & OPS"
-	pwr_hdr.add_theme_font_size_override("font_size", 13)
+	pwr_hdr.add_theme_font_size_override("font_size", 16)
 	pwr_hdr.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	pwr_col.add_child(pwr_hdr)
 	battery_label = Label.new()
-	battery_label.add_theme_font_size_override("font_size", 14)
+	battery_label.add_theme_font_size_override("font_size", 17)
 	pwr_col.add_child(battery_label)
 	battery_bar = ProgressBar.new()
 	battery_bar.custom_minimum_size.y = 14
@@ -304,7 +307,7 @@ func _build_top_right() -> void:
 	pwr_col.add_child(battery_bar)
 	skip_mission_button = Button.new()
 	skip_mission_button.text = "Skip mission time"
-	skip_mission_button.add_theme_font_size_override("font_size", 14)
+	skip_mission_button.add_theme_font_size_override("font_size", 17)
 	UI.style_button(skip_mission_button, "green", 10, 5, 3)
 	pwr_col.add_child(skip_mission_button)
 
@@ -336,7 +339,7 @@ func _build_top_right() -> void:
 		btn_dv.text = "Δv"
 		btn_dv.tooltip_text = "Toggle Orbital Burn Planner"
 		btn_dv.custom_minimum_size = Vector2(36, 34)
-		btn_dv.add_theme_font_size_override("font_size", 14)
+		btn_dv.add_theme_font_size_override("font_size", 17)
 		UI.style_button(btn_dv, "slate", 4, 4, 3)
 		btn_dv.pressed.connect(func(): burn_drawer.visible = not burn_drawer.visible)
 		app_col.add_child(btn_dv)
@@ -350,7 +353,7 @@ func _build_top_right() -> void:
 		guidance_label = Label.new()
 		guidance_label.custom_minimum_size.x = 300.0
 		guidance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		guidance_label.add_theme_font_size_override("font_size", 14)
+		guidance_label.add_theme_font_size_override("font_size", 17)
 		guide.add_child(guidance_label)
 		guidance_hold = Button.new()
 		guidance_hold.text = "Steering hold"
@@ -363,7 +366,8 @@ func _build_top_right() -> void:
 	_map_panel.add_theme_stylebox_override("panel", UI.metallic_panel(Color(0.12, 0.15, 0.19, 0.92), UI.SLATE_BORDER, 6, 8))
 	drawer_stack.add_child(_map_panel)
 	map_readout = Label.new()
-	map_readout.add_theme_font_size_override("font_size", 14)
+	map_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	map_readout.add_theme_font_size_override("font_size", 17)
 	map_readout.add_theme_color_override("font_color", UI.KSP_CYAN)
 	_map_panel.add_child(map_readout)
 	_map_panel.hide()
@@ -372,7 +376,7 @@ func _build_top_right() -> void:
 	map_button.text = "Map"
 	map_button.tooltip_text = "Map view (M)"
 	map_button.custom_minimum_size = Vector2(36, 34)
-	map_button.add_theme_font_size_override("font_size", 12)
+	map_button.add_theme_font_size_override("font_size", 14)
 	UI.style_button(map_button, "blue", 4, 4, 3)
 	app_col.add_child(map_button)
 
@@ -380,7 +384,7 @@ func _build_top_right() -> void:
 	reset_cam_button.text = "Cam"
 	reset_cam_button.tooltip_text = "Reset camera view"
 	reset_cam_button.custom_minimum_size = Vector2(36, 34)
-	reset_cam_button.add_theme_font_size_override("font_size", 12)
+	reset_cam_button.add_theme_font_size_override("font_size", 14)
 	UI.style_button(reset_cam_button, "slate", 4, 4, 3)
 	app_col.add_child(reset_cam_button)
 
@@ -423,18 +427,18 @@ func _build_bottom_left() -> void:
 		stage_hint = Label.new()
 		stage_hint.custom_minimum_size.x = 190.0
 		stage_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		stage_hint.add_theme_font_size_override("font_size", 13)
+		stage_hint.add_theme_font_size_override("font_size", 16)
 		stage_hint.add_theme_color_override("font_color", UI.WHITE)
 		_stage_hint_panel.add_child(stage_hint)
 		_stage_hint_panel.hide()
-		start_button.add_theme_font_size_override("font_size", 15)
+		start_button.add_theme_font_size_override("font_size", 18)
 		UI.style_button(start_button, "green", 10, 6, 4)
 		col.add_child(start_button)
 
 		skip_ascent_button = Button.new()
 		skip_ascent_button.text = "Skip to Orbit"
 		skip_ascent_button.visible = false
-		skip_ascent_button.add_theme_font_size_override("font_size", 14)
+		skip_ascent_button.add_theme_font_size_override("font_size", 17)
 		UI.style_button(skip_ascent_button, "blue", 10, 5, 4)
 		col.add_child(skip_ascent_button)
 
@@ -454,7 +458,7 @@ func _build_bottom_left() -> void:
 	trim_col.add_child(stg_row)
 	var stg_lbl := Label.new()
 	stg_lbl.text = "STAGE"
-	stg_lbl.add_theme_font_size_override("font_size", 11)
+	stg_lbl.add_theme_font_size_override("font_size", 13)
 	stg_lbl.add_theme_color_override("font_color", UI.MUTED)
 	stg_row.add_child(stg_lbl)
 
@@ -463,7 +467,7 @@ func _build_bottom_left() -> void:
 	stg_row.add_child(stg_well)
 	stage_num_label = Label.new()
 	stage_num_label.text = "001" if mode == "launch" else "000"
-	stage_num_label.add_theme_font_size_override("font_size", 15)
+	stage_num_label.add_theme_font_size_override("font_size", 18)
 	stage_num_label.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	stg_well.add_child(stage_num_label)
 
@@ -473,14 +477,14 @@ func _build_bottom_left() -> void:
 
 func _build_bottom_center() -> void:
 	navball = NavballControl.new()
-	navball.custom_minimum_size = Vector2(210, 198)
+	navball.custom_minimum_size = Vector2(210, 208)
 	navball.anchor_left = 0.5
 	navball.anchor_right = 0.5
 	navball.anchor_top = 1.0
 	navball.anchor_bottom = 1.0
 	navball.offset_left = -105
 	navball.offset_right = 105
-	navball.offset_top = -198
+	navball.offset_top = -208
 	navball.offset_bottom = 0
 	navball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(navball)
@@ -508,13 +512,13 @@ func set_stage_cards(cards: Array) -> void:
 		vbox.add_child(row)
 		var idx := Label.new()
 		idx.text = str(card.get("index", 0))
-		idx.add_theme_font_size_override("font_size", 13)
+		idx.add_theme_font_size_override("font_size", 16)
 		idx.add_theme_color_override("font_color", UI.KSP_AMBER)
 		row.add_child(idx)
 		row.add_child(UI.icon(str(card.get("icon", "propulsion")), Vector2(16, 16), UI.WHITE))
 		var title := Label.new()
 		title.text = str(card.get("label", "STAGE"))
-		title.add_theme_font_size_override("font_size", 12)
+		title.add_theme_font_size_override("font_size", 14)
 		title.add_theme_color_override("font_color", UI.KSP_CYAN if not active else UI.WHITE)
 		row.add_child(title)
 
@@ -552,7 +556,7 @@ func update_map_markers(camera: Camera3D, markers: Array) -> void:
 			label.add_theme_color_override("font_color", UI.KSP_CYAN)
 			label.add_theme_color_override("font_outline_color", Color.BLACK)
 			label.add_theme_constant_override("outline_size", 5)
-			label.add_theme_font_size_override("font_size", 14)
+			label.add_theme_font_size_override("font_size", 17)
 			add_child(label)
 			_map_markers.append(label)
 		var label := _map_markers[i]
@@ -646,7 +650,7 @@ class AtmoBar extends Control:
 			draw_rect(Rect2(2.0 + w * b[0], 2.0, w * (b[1] - b[0]), h), b[2])
 		var font := ThemeDB.fallback_font
 		if font:
-			draw_string(font, Vector2(0, size.y - 4), "ATMOSPHERE", HORIZONTAL_ALIGNMENT_CENTER, size.x, 10, Color(1, 1, 1, 0.78))
+			draw_string(font, Vector2(0, size.y - 4), "ATMOSPHERE", HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.78))
 		var nx := 2.0 + w * density
 		draw_line(Vector2(nx, 0), Vector2(nx, size.y), Color.WHITE, 2.2)
 		draw_rect(Rect2(Vector2.ZERO, size), Color("46505e"), false, 1.0)
@@ -681,9 +685,9 @@ class TrimReadout extends Control:
 		for i in 3:
 			var y := 4.0 + i * 15.0
 			if font:
-				draw_string(font, Vector2(0, y + 9), rows[i][0], HORIZONTAL_ALIGNMENT_LEFT, 40, 9, Color("9da7b3"))
-			var bx := 38.0
-			var bw := size.x - 42.0
+				draw_string(font, Vector2(0, y + 10), rows[i][0], HORIZONTAL_ALIGNMENT_LEFT, 44, 11, Color("9da7b3"))
+			var bx := 44.0
+			var bw := size.x - bx - 4.0
 			draw_rect(Rect2(bx, y, bw, 10.0), Color("10151c"))
 			draw_rect(Rect2(bx, y, bw, 10.0), Color("3c4554"), false, 1.0)
 			var mid := bx + bw * 0.5
@@ -804,21 +808,21 @@ class NavballControl extends Control:
 
 		draw_arc(ball_c, ball_r, 0, TAU, 48, Color("11151b"), 2.5, true)
 
-		var top_rect := Rect2(w * 0.5 - 56, 6, 112, 34)
+		var top_rect := Rect2(w * 0.5 - 56, 4, 112, 39)
 		draw_rect(top_rect, Color("11161d"))
 		draw_rect(top_rect, Color("5b6677"), false, 1.8)
 		var font := ThemeDB.fallback_font
 		if font:
-			draw_string(font, Vector2(top_rect.position.x, top_rect.position.y + 13), speed_mode, HORIZONTAL_ALIGNMENT_CENTER, top_rect.size.x, 11, Color("9ad9ab"))
+			draw_string(font, Vector2(top_rect.position.x, top_rect.position.y + 15), speed_mode, HORIZONTAL_ALIGNMENT_CENTER, top_rect.size.x, 13, Color("9ad9ab"))
 			var spd_txt := "%.1f m/s" % speed_mps if speed_mps < 1500.0 else "%.2f km/s" % (speed_mps / 1000.0)
-			draw_string(font, Vector2(top_rect.position.x, top_rect.position.y + 29), spd_txt, HORIZONTAL_ALIGNMENT_CENTER, top_rect.size.x, 14, Color("86f257"))
+			draw_string(font, Vector2(top_rect.position.x, top_rect.position.y + 33), spd_txt, HORIZONTAL_ALIGNMENT_CENTER, top_rect.size.x, 17, Color("86f257"))
 
 			draw_rect(Rect2(w * 0.5 - 82, 26, 24, 14), Color("16212b"))
-			draw_string(font, Vector2(w * 0.5 - 82, 37), "RCS", HORIZONTAL_ALIGNMENT_CENTER, 24, 9, Color("6f7d8c"))
+			draw_string(font, Vector2(w * 0.5 - 82, 37), "RCS", HORIZONTAL_ALIGNMENT_CENTER, 24, 11, Color("6f7d8c"))
 			draw_rect(Rect2(w * 0.5 + 58, 26, 24, 14), Color("1f3b24"))
-			draw_string(font, Vector2(w * 0.5 + 58, 37), "SAS", HORIZONTAL_ALIGNMENT_CENTER, 24, 9, Color("8ef060") if steering_hold_active else Color("6f7d8c"))
+			draw_string(font, Vector2(w * 0.5 + 58, 37), "SAS", HORIZONTAL_ALIGNMENT_CENTER, 24, 11, Color("8ef060") if steering_hold_active else Color("6f7d8c"))
 
-			var hdg_rect := Rect2(w * 0.5 - 34, h - 19, 68, 17)
+			var hdg_rect := Rect2(w * 0.5 - 42, h - 21, 84, 19)
 			draw_rect(hdg_rect, Color("10141b"))
 			draw_rect(hdg_rect, Color("4d5866"), false, 1.2)
-			draw_string(font, Vector2(hdg_rect.position.x, hdg_rect.position.y + 13), "HDG %03d°" % (int(round(fposmod(heading_deg, 360.0))) % 360), HORIZONTAL_ALIGNMENT_CENTER, hdg_rect.size.x, 11, Color("86f257"))
+			draw_string(font, Vector2(hdg_rect.position.x, hdg_rect.position.y + 13), "HDG %03d°" % (int(round(fposmod(heading_deg, 360.0))) % 360), HORIZONTAL_ALIGNMENT_CENTER, hdg_rect.size.x, 13, Color("86f257"))

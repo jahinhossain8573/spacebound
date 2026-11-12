@@ -18,7 +18,7 @@ func _ready() -> void:
 	title_font.variation_embolden = 0.8
 	title.add_theme_font_override("font", title_font)
 	title.add_theme_color_override("font_color", Color.WHITE)
-	title.add_theme_font_size_override("font_size", 64)
+	title.add_theme_font_size_override("font_size", 77)
 	add_child(title)
 
 	var margin := MarginContainer.new()

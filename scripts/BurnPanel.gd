@@ -26,14 +26,14 @@ func setup(owner_flight: Control) -> void:
 	if not build.is_empty(): dry_kg = preload("res://scripts/BuildStats.gd").new().calculate_stats(build, flight.mission).dry_mass_kg
 	var title := Label.new()
 	title.text = "MANEUVER / ORBITAL BURN"
-	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", UI.KSP_CYAN)
 	add_child(title)
 	var controls := HBoxContainer.new()
 	controls.add_theme_constant_override("separation", 6)
 	add_child(controls)
 	_value = SpinBox.new()
-	_value.custom_minimum_size.x = 120
+	_value.custom_minimum_size.x = 150
 	_value.step = 1
 	# Commit the full typed value before refreshing the prediction.
 	_value.update_on_text_changed = false
@@ -41,37 +41,38 @@ func setup(owner_flight: Control) -> void:
 	_value.value_changed.connect(func(_v): refresh())
 	controls.add_child(_value)
 	_direction = OptionButton.new()
+	_direction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_direction.add_item("Prograde")
 	_direction.add_item("Retrograde")
-	_direction.add_theme_font_size_override("font_size", 13)
+	_direction.add_theme_font_size_override("font_size", 16)
 	_direction.item_selected.connect(func(_i): refresh())
 	controls.add_child(_direction)
 	_execute = Button.new()
 	_execute.text = "Execute burn"
-	_execute.add_theme_font_size_override("font_size", 13)
+	_execute.add_theme_font_size_override("font_size", 16)
 	UI.style_button(_execute, "amber", 8, 4, 3)
 	_execute.pressed.connect(_on_execute)
-	controls.add_child(_execute)
+	add_child(_execute)
 	var apsis_row := HBoxContainer.new()
 	apsis_row.add_theme_constant_override("separation", 6)
 	add_child(apsis_row)
 	_apo = Button.new()
 	_apo.text = "Wait for apoapsis"
 	_apo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_apo.add_theme_font_size_override("font_size", 12)
+	_apo.add_theme_font_size_override("font_size", 14)
 	UI.style_button(_apo, "slate", 8, 4, 3)
 	_apo.pressed.connect(func(): flight.wait_for_apsis(true))
 	apsis_row.add_child(_apo)
 	_peri = Button.new()
 	_peri.text = "Wait for periapsis"
 	_peri.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_peri.add_theme_font_size_override("font_size", 12)
+	_peri.add_theme_font_size_override("font_size", 14)
 	UI.style_button(_peri, "slate", 8, 4, 3)
 	_peri.pressed.connect(func(): flight.wait_for_apsis(false))
 	apsis_row.add_child(_peri)
 	_info = Label.new()
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_info.add_theme_font_size_override("font_size", 12)
+	_info.add_theme_font_size_override("font_size", 14)
 	_info.add_theme_color_override("font_color", UI.MUTED)
 	add_child(_info)
 	refresh()

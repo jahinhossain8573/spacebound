@@ -35,7 +35,7 @@ func _label(text: String, parent: Node, tint: Color = UI.WHITE, font_size: int =
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", tint)
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", roundi(font_size * 1.2))
 	parent.add_child(label)
 	return label
 
@@ -64,7 +64,7 @@ func _ready() -> void:
 	var branches := OptionButton.new()
 	branches.add_item("All Disciplines")
 	for title in TITLES: branches.add_item(title)
-	branches.add_theme_font_size_override("font_size", 13)
+	branches.add_theme_font_size_override("font_size", 16)
 	branches.item_selected.connect(func(index: int):
 		if index == 0:
 			_scroll.scroll_vertical = 0
@@ -74,7 +74,7 @@ func _ready() -> void:
 	top.right_box.add_child(branches)
 
 	var back_btn := _button("< Missions", func(): get_tree().change_scene_to_file("res://scenes/MissionSelect.tscn"), top.right_box)
-	back_btn.add_theme_font_size_override("font_size", 14)
+	back_btn.add_theme_font_size_override("font_size", 17)
 	UI.style_button(back_btn, "amber", 10, 4, 3)
 
 	# 2. Main Split: Blueprint Canvas on Left + Metallic R&D Inspector on Right
@@ -118,15 +118,15 @@ func _ready() -> void:
 	zoom_row.add_theme_constant_override("separation", 6)
 	zoom_pod.add_child(zoom_row)
 	var z_minus := _button("−", func(): _set_zoom(_zoom - 0.15), zoom_row)
-	z_minus.add_theme_font_size_override("font_size", 14)
+	z_minus.add_theme_font_size_override("font_size", 17)
 	UI.style_button(z_minus, "slate", 7, 2, 3)
 	_zoom_label = _label("100%", zoom_row, UI.WHITE, 14)
 	_zoom_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var z_plus := _button("+", func(): _set_zoom(_zoom + 0.15), zoom_row)
-	z_plus.add_theme_font_size_override("font_size", 14)
+	z_plus.add_theme_font_size_override("font_size", 17)
 	UI.style_button(z_plus, "slate", 7, 2, 3)
 	var z_rst := _button("1:1", func(): _set_zoom(1.0); _scroll.scroll_horizontal = 0; _scroll.scroll_vertical = 0, zoom_row)
-	z_rst.add_theme_font_size_override("font_size", 12)
+	z_rst.add_theme_font_size_override("font_size", 14)
 	UI.style_button(z_rst, "slate", 6, 2, 3)
 
 	# 3. Right Metallic KSP R&D Sidebar
@@ -146,13 +146,13 @@ func _ready() -> void:
 	var search := LineEdit.new()
 	search.placeholder_text = "Enter search..."
 	search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	search.add_theme_font_size_override("font_size", 14)
+	search.add_theme_font_size_override("font_size", 17)
 	search.text_changed.connect(_search)
 	search_row.add_child(search)
 	var clear_btn := Button.new()
 	clear_btn.text = "⌕"
 	clear_btn.tooltip_text = "Clear search"
-	clear_btn.add_theme_font_size_override("font_size", 15)
+	clear_btn.add_theme_font_size_override("font_size", 18)
 	UI.style_button(clear_btn, "amber", 8, 3, 3)
 	clear_btn.pressed.connect(func(): search.text = ""; _search(""))
 	search_row.add_child(clear_btn)
@@ -171,7 +171,7 @@ func _ready() -> void:
 	# Blue KSP "Research [⚛ X]" Action Button
 	_action = _button("RESEARCH", func(): _confirm(_selected), inspector)
 	_action.custom_minimum_size.y = 42
-	_action.add_theme_font_size_override("font_size", 16)
+	_action.add_theme_font_size_override("font_size", 19)
 	UI.style_button(_action, "blue", 12, 8, 4)
 
 	# Bottom "Requires:" strip
@@ -310,7 +310,7 @@ func _build_tree() -> void:
 		var code_lbl := Label.new()
 		code_lbl.text = str(node.id)
 		code_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		code_lbl.add_theme_font_size_override("font_size", 11)
+		code_lbl.add_theme_font_size_override("font_size", 13)
 		code_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		vbox.add_child(code_lbl)
 		_node_badges[node.id] = {"icon": ic, "code": code_lbl}
@@ -480,7 +480,7 @@ func _show_details() -> void:
 			var cost_lbl := Label.new()
 			cost_lbl.text = "√ $%.2fM" % float(rec.get("costMillions", 0.0))
 			cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			cost_lbl.add_theme_font_size_override("font_size", 11)
+			cost_lbl.add_theme_font_size_override("font_size", 13)
 			cost_lbl.add_theme_color_override("font_color", Color("cfd7e2"))
 			tile_col.add_child(cost_lbl)
 
@@ -490,10 +490,6 @@ func _show_details() -> void:
 
 	# Bottom "Requires:" strip
 	_label("Requires:", _requires_box, Color("cfd7e2"), 13)
-	var req_flow := HBoxContainer.new()
-	req_flow.add_theme_constant_override("separation", 8)
-	_requires_box.add_child(req_flow)
-
 	if node.prereqNodes.is_empty():
 		var start_chip := PanelContainer.new()
 		start_chip.add_theme_stylebox_override("panel", UI.metallic_panel(Color("256624"), Color("76e649"), 4, 5))
@@ -502,13 +498,14 @@ func _show_details() -> void:
 		start_chip.add_child(sc_row)
 		sc_row.add_child(UI.icon("launch", Vector2(20, 20), UI.WHITE))
 		_label("Start (Tier %d)" % node.tier, sc_row, UI.WHITE, 13)
-		req_flow.add_child(start_chip)
+		_requires_box.add_child(start_chip)
 	else:
 		for id in node.prereqNodes:
 			var prereq: Dictionary = GlobalData.get_tech_node(id)
 			var owned_pre := GameManager.research_status(id) == "Owned"
-			var pb := _button("%s · %s" % [id, prereq.name], _navigate.bind(id), req_flow)
-			pb.add_theme_font_size_override("font_size", 12)
+			var pb := _button("%s · %s" % [id, prereq.name], _navigate.bind(id), _requires_box)
+			pb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			pb.add_theme_font_size_override("font_size", 14)
 			UI.style_button(pb, "green" if owned_pre else "slate", 8, 5, 4)
 
 	if node.prereqMission != null:
@@ -622,4 +619,4 @@ class PartCountBadge extends Control:
 		draw_arc(c, r, 0, TAU, 16, Color("9ef56c"), 1.5, true)
 		var font := ThemeDB.fallback_font
 		if font:
-			draw_string(font, Vector2(0, size.y - 4), str(count), HORIZONTAL_ALIGNMENT_CENTER, size.x, 10, Color.WHITE)
+			draw_string(font, Vector2(0, size.y - 4), str(count), HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color.WHITE)

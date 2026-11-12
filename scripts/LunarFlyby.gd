@@ -193,7 +193,7 @@ func _create_hud() -> void:
 	row.add_child(_direction)
 	_prediction = Label.new()
 	_prediction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_prediction.add_theme_font_size_override("font_size", 14)
+	_prediction.add_theme_font_size_override("font_size", 17)
 	controls.add_child(_prediction)
 	_burn = Button.new()
 	_burn.text = "Execute correction"

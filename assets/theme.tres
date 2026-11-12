@@ -100,7 +100,7 @@ content_margin_bottom = 10.0
 
 [resource]
 default_font = ExtResource("1_font")
-default_font_size = 22
+default_font_size = 26
 Button/styles/normal = SubResource("normal")
 Button/styles/hover = SubResource("hover")
 Button/styles/pressed = SubResource("pressed")

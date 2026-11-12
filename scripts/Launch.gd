@@ -193,7 +193,7 @@ func _create_ui() -> void:
 		var wb := Button.new()
 		wb.text = "%dx" % level
 		wb.tooltip_text = "Time Warp %dx (Keys 1-6 or . / ,)" % level
-		wb.add_theme_font_size_override("font_size", 12)
+		wb.add_theme_font_size_override("font_size", 14)
 		UI.style_button(wb, "green" if level == 1 else "slate", 7, 3, 3)
 		wb.pressed.connect(set_launch_warp.bind(level))
 		_hud_overlay.warp_box.add_child(wb)

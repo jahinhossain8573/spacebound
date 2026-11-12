@@ -89,7 +89,7 @@ func _make_ui() -> void:
 	var search := LineEdit.new()
 	search.placeholder_text = "Enter search..."
 	search.custom_minimum_size.x = 248
-	search.add_theme_font_size_override("font_size", 14)
+	search.add_theme_font_size_override("font_size", 17)
 	search.text_changed.connect(func(q: String):
 		_part_search_query = q.strip_edges().to_lower()
 		_refresh_parts()
@@ -101,35 +101,30 @@ func _make_ui() -> void:
 		tag.add_theme_stylebox_override("panel", UI.inset_well(Color("162530"), Color("386b82"), 3, 4))
 		var tl := Label.new()
 		tl.text = mode_lbl
-		tl.add_theme_font_size_override("font_size", 12)
+		tl.add_theme_font_size_override("font_size", 14)
 		tl.add_theme_color_override("font_color", UI.KSP_CYAN)
 		tag.add_child(tl)
 		top_row.add_child(tag)
 
-	var sp_l := Control.new()
-	sp_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(sp_l)
-
 	# Center Craft / Mission Name Plaque (matches "Untitled Space Craft" plaque in Photo 3)
 	var plaque := PanelContainer.new()
-	plaque.custom_minimum_size.x = 380
+	plaque.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	plaque.add_theme_stylebox_override("panel", UI.inset_well(Color("171c23"), Color("5c6778"), 4, 5))
 	top_row.add_child(plaque)
 	var title := Label.new()
 	title.text = "%s   •   %s (%s)" % [str(mission.title), str(bus.name), str(launcher.name)]
+	title.tooltip_text = title.text
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color("ffd97d"))
 	plaque.add_child(title)
-
-	var sp_r := Control.new()
-	sp_r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(sp_r)
 
 	# Top-right KSP Action Toolbar (Reset Cam, Readiness Review, Green Launch, Orange Exit)
 	var reset := Button.new()
 	reset.text = "Reset View"
-	reset.add_theme_font_size_override("font_size", 14)
+	reset.add_theme_font_size_override("font_size", 17)
 	UI.style_button(reset, "slate", 10, 4, 3)
 	reset.pressed.connect(_reset_camera)
 	top_row.add_child(reset)
@@ -137,7 +132,7 @@ func _make_ui() -> void:
 	var top_review := Button.new()
 	top_review.text = "Readiness"
 	top_review.tooltip_text = "Run Flight Readiness Review"
-	top_review.add_theme_font_size_override("font_size", 14)
+	top_review.add_theme_font_size_override("font_size", 17)
 	UI.style_button(top_review, "blue", 10, 4, 3)
 	top_review.pressed.connect(_show_review)
 	top_row.add_child(top_review)
@@ -146,7 +141,7 @@ func _make_ui() -> void:
 	_launch.text = "▶ Launch"
 	_launch.disabled = true
 	_launch.custom_minimum_size.x = 108
-	_launch.add_theme_font_size_override("font_size", 15)
+	_launch.add_theme_font_size_override("font_size", 18)
 	UI.style_button(_launch, "green", 12, 4, 3)
 	_launch.pressed.connect(_launch_build)
 	top_row.add_child(_launch)
@@ -154,7 +149,7 @@ func _make_ui() -> void:
 	var back := Button.new()
 	back.text = "< Back"
 	back.tooltip_text = "Return to Mission Control"
-	back.add_theme_font_size_override("font_size", 14)
+	back.add_theme_font_size_override("font_size", 17)
 	UI.style_button(back, "amber", 10, 4, 3)
 	back.pressed.connect(_back)
 	top_row.add_child(back)
@@ -204,7 +199,7 @@ func _make_ui() -> void:
 	var sort_hdr := Label.new()
 	sort_hdr.text = "Name  ·  Mass  ·  Cost  ·  Power"
 	sort_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sort_hdr.add_theme_font_size_override("font_size", 12)
+	sort_hdr.add_theme_font_size_override("font_size", 14)
 	sort_hdr.add_theme_color_override("font_color", UI.MUTED)
 	parts_vbox.add_child(sort_hdr)
 
@@ -237,7 +232,7 @@ func _make_ui() -> void:
 	cost_well.add_theme_stylebox_override("panel", UI.inset_well(UI.LCD_BG, Color("574b24"), 3, 4))
 	cost_col.add_child(cost_well)
 	_cost_readout_label = Label.new()
-	_cost_readout_label.add_theme_font_size_override("font_size", 15)
+	_cost_readout_label.add_theme_font_size_override("font_size", 18)
 	_cost_readout_label.add_theme_color_override("font_color", UI.GOLD)
 	cost_well.add_child(_cost_readout_label)
 
@@ -245,7 +240,7 @@ func _make_ui() -> void:
 	budget_well.add_theme_stylebox_override("panel", UI.inset_well(UI.LCD_BG, Color("2e4a29"), 3, 4))
 	cost_col.add_child(budget_well)
 	_budget_readout_label = Label.new()
-	_budget_readout_label.add_theme_font_size_override("font_size", 14)
+	_budget_readout_label.add_theme_font_size_override("font_size", 17)
 	_budget_readout_label.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	budget_well.add_child(_budget_readout_label)
 
@@ -280,7 +275,7 @@ func _make_ui() -> void:
 
 	var installed_label := Label.new()
 	installed_label.text = "INSTALLED PAYLOAD PARTS"
-	installed_label.add_theme_font_size_override("font_size", 14)
+	installed_label.add_theme_font_size_override("font_size", 17)
 	installed_label.add_theme_color_override("font_color", UI.KSP_AMBER)
 	_build_tab_box.add_child(installed_label)
 
@@ -298,7 +293,7 @@ func _make_ui() -> void:
 	_build_tab_box.add_child(_fuel_box)
 	var fuel_label := Label.new()
 	fuel_label.text = "PROPELLANT TANKS (kg)"
-	fuel_label.add_theme_font_size_override("font_size", 14)
+	fuel_label.add_theme_font_size_override("font_size", 17)
 	fuel_label.add_theme_color_override("font_color", UI.KSP_CYAN)
 	_fuel_box.add_child(fuel_label)
 	_slider = HSlider.new()
@@ -314,36 +309,36 @@ func _make_ui() -> void:
 	_fuel_box.add_child(_spin)
 	_fuel_hint = Label.new()
 	_fuel_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_fuel_hint.add_theme_font_size_override("font_size", 12)
+	_fuel_hint.add_theme_font_size_override("font_size", 14)
 	_fuel_hint.add_theme_color_override("font_color", UI.MUTED)
 	_fuel_box.add_child(_fuel_hint)
 	var fill := Button.new()
 	fill.text = "Fill to required Δv + 10%"
-	fill.add_theme_font_size_override("font_size", 13)
+	fill.add_theme_font_size_override("font_size", 16)
 	UI.style_button(fill, "blue", 8, 4, 3)
 	fill.pressed.connect(fill_to_required_delta_v)
 	_fuel_box.add_child(fill)
 	_message = Label.new()
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.add_theme_font_size_override("font_size", 12)
+	_message.add_theme_font_size_override("font_size", 14)
 	_message.add_theme_color_override("font_color", Color("ff8811"))
 	_fuel_box.add_child(_message)
 
 	_notice = Label.new()
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_notice.add_theme_font_size_override("font_size", 13)
+	_notice.add_theme_font_size_override("font_size", 16)
 	_build_tab_box.add_child(_notice)
 
 	var review_button := Button.new()
 	review_button.text = "Run Readiness Review"
-	review_button.add_theme_font_size_override("font_size", 14)
+	review_button.add_theme_font_size_override("font_size", 17)
 	UI.style_button(review_button, "amber", 10, 5, 3)
 	review_button.pressed.connect(_show_review)
 	_build_tab_box.add_child(review_button)
 
 	var telem_hdr := Label.new()
 	telem_hdr.text = "ENGINEER REPORT"
-	telem_hdr.add_theme_font_size_override("font_size", 14)
+	telem_hdr.add_theme_font_size_override("font_size", 17)
 	telem_hdr.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT)
 	_build_tab_box.add_child(telem_hdr)
 
@@ -367,19 +362,19 @@ func _make_ui() -> void:
 	var objective_title := Label.new()
 	objective_title.text = "MISSION OBJECTIVE  /  " + str(mission.title)
 	objective_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_title.add_theme_font_size_override("font_size", 15)
+	objective_title.add_theme_font_size_override("font_size", 18)
 	objective_title.add_theme_color_override("font_color", UI.KSP_AMBER)
 	objective_content.add_child(objective_title)
 	var objective_brief := Label.new()
 	objective_brief.text = str(mission.get("briefing", ""))
 	objective_brief.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_brief.add_theme_font_size_override("font_size", 14)
+	objective_brief.add_theme_font_size_override("font_size", 17)
 	objective_content.add_child(objective_brief)
 	if mission.has("historyNote"):
 		var history := Label.new()
 		history.text = "History: " + str(mission.historyNote)
 		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		history.add_theme_font_size_override("font_size", 13)
+		history.add_theme_font_size_override("font_size", 16)
 		history.add_theme_color_override("font_color", Color("f0c674"))
 		objective_content.add_child(history)
 	var required_names: Array[String] = []
@@ -388,7 +383,7 @@ func _make_ui() -> void:
 	var objective_details := Label.new()
 	objective_details.text = "Orbit: %s · %s km · %s days\nRequired Hardware: %s" % [mission.get("targetOrbit", ""), mission.get("targetAltitudeKm", 0), mission.get("durationDays", 0), ", ".join(required_names)]
 	objective_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective_details.add_theme_font_size_override("font_size", 14)
+	objective_details.add_theme_font_size_override("font_size", 17)
 	objective_details.add_theme_color_override("font_color", UI.KSP_CYAN)
 	objective_content.add_child(objective_details)
 
@@ -401,6 +396,7 @@ func _make_ui() -> void:
 	bottom_right.offset_left = -420
 	bottom_right.offset_top = -44
 	bottom_right.offset_right = -6
+	bottom_right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	bottom_right.offset_bottom = -4
 	bottom_right.alignment = BoxContainer.ALIGNMENT_END
 	bottom_right.add_theme_constant_override("separation", 6)
@@ -415,19 +411,19 @@ func _make_ui() -> void:
 
 	var btn_eng := Button.new()
 	btn_eng.text = "Δv / Engineer"
-	btn_eng.add_theme_font_size_override("font_size", 13)
+	btn_eng.add_theme_font_size_override("font_size", 16)
 	UI.style_button(btn_eng, "tab_active", 8, 3, 3)
 	dock_btns.add_child(btn_eng)
 
 	var btn_brief := Button.new()
 	btn_brief.text = "Briefing"
-	btn_brief.add_theme_font_size_override("font_size", 13)
+	btn_brief.add_theme_font_size_override("font_size", 16)
 	UI.style_button(btn_brief, "slate", 8, 3, 3)
 	dock_btns.add_child(btn_brief)
 
 	var btn_hide := Button.new()
 	btn_hide.text = "Hide UI"
-	btn_hide.add_theme_font_size_override("font_size", 13)
+	btn_hide.add_theme_font_size_override("font_size", 16)
 	UI.style_button(btn_hide, "slate", 8, 3, 3)
 	dock_btns.add_child(btn_hide)
 
@@ -454,7 +450,7 @@ func _make_ui() -> void:
 	bottom_right.add_child(stage_pill)
 	_stage_dv_badge = Label.new()
 	_stage_dv_badge.text = "0 m/s"
-	_stage_dv_badge.add_theme_font_size_override("font_size", 13)
+	_stage_dv_badge.add_theme_font_size_override("font_size", 16)
 	_stage_dv_badge.add_theme_color_override("font_color", UI.KSP_CYAN)
 	stage_pill.add_child(_stage_dv_badge)
 
@@ -566,30 +562,34 @@ func _refresh_parts() -> void:
 
 		var cat_hdr := Label.new()
 		cat_hdr.text = "▾ " + category.to_upper()
-		cat_hdr.add_theme_font_size_override("font_size", 13)
+		cat_hdr.add_theme_font_size_override("font_size", 16)
 		cat_hdr.add_theme_color_override("font_color", UI.KSP_AMBER)
 		_category_container.add_child(cat_hdr)
 
 		for part: Dictionary in matching_parts:
+			var tile := PanelContainer.new()
+			tile.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 			var button := Button.new()
 			button.custom_minimum_size.y = 58
-			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var is_req: bool = part.id in req_ids
 			UI.style_button(button, "tile_selected" if is_req else "tile", 6, 4, 3)
 			button.tooltip_text = "%s\nMass: %.2f kg  |  Volume: %.2f L\nPower: +%.1f W / -%.1f W  |  Cost: $%.2fM\n%s" % [
 				part.name, part.massKg, part.volumeLiters, part.powerGenWatts, part.powerDrawWatts, part.costMillions, part.heritage
 			]
 			button.pressed.connect(add_part.bind(part.id))
+			tile.add_child(button)
 
+			var padding := MarginContainer.new()
+			padding.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			padding.add_theme_constant_override("margin_left", 6)
+			padding.add_theme_constant_override("margin_right", 6)
+			padding.add_theme_constant_override("margin_top", 4)
+			padding.add_theme_constant_override("margin_bottom", 4)
+			tile.add_child(padding)
 			var row := HBoxContainer.new()
-			row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			row.offset_left = 6
-			row.offset_right = -6
-			row.offset_top = 4
-			row.offset_bottom = -4
 			row.add_theme_constant_override("separation", 8)
 			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			button.add_child(row)
+			padding.add_child(row)
 
 			row.add_child(UI.part_preview(part, Vector2(44, 44)))
 
@@ -603,19 +603,20 @@ func _refresh_parts() -> void:
 			var nm := Label.new()
 			nm.text = str(part.name) + (" ★" if is_req else "")
 			nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			nm.add_theme_font_size_override("font_size", 13)
+			nm.add_theme_font_size_override("font_size", 16)
 			nm.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT if is_req else UI.WHITE)
 			nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			txt_col.add_child(nm)
 
 			var specs := Label.new()
 			specs.text = "%.2f kg · +%.0f/-%.1fW · $%.2fM" % [part.massKg, part.powerGenWatts, part.powerDrawWatts, part.costMillions]
-			specs.add_theme_font_size_override("font_size", 11)
+			specs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			specs.add_theme_font_size_override("font_size", 13)
 			specs.add_theme_color_override("font_color", UI.MUTED)
 			specs.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			txt_col.add_child(specs)
 
-			_category_container.add_child(button)
+			_category_container.add_child(tile)
 			if part.get("thrustNewtons", 0.0) > 0.0:
 				button.disabled = not _engine().is_empty()
 				_engine_buttons.append(button)
@@ -710,7 +711,7 @@ func _refresh_build() -> void:
 		if indices.is_empty(): continue
 		var heading := Label.new()
 		heading.text = category.to_upper().replace("_", " ")
-		heading.add_theme_font_size_override("font_size", 12)
+		heading.add_theme_font_size_override("font_size", 14)
 		heading.add_theme_color_override("font_color", UI.KSP_CYAN)
 		_installed_container.add_child(heading)
 		for index in indices:
@@ -721,12 +722,12 @@ func _refresh_build() -> void:
 			label.text = installed_components[index].name
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			label.add_theme_font_size_override("font_size", 13)
+			label.add_theme_font_size_override("font_size", 16)
 			row.add_child(label)
 			var remove := Button.new()
 			remove.text = "×"
 			remove.tooltip_text = "Remove " + str(installed_components[index].name)
-			remove.add_theme_font_size_override("font_size", 13)
+			remove.add_theme_font_size_override("font_size", 16)
 			UI.style_button(remove, "red", 7, 2, 3)
 			remove.pressed.connect(remove_part.bind(index))
 			row.add_child(remove)
@@ -850,12 +851,12 @@ func _update_readiness() -> void:
 	if mission.get("targetOrbit", "") == "SSO":
 		var capacity := Label.new()
 		capacity.text = "SSO capacity: %.0f kg" % stats.launcher_capacity_kg
-		capacity.add_theme_font_size_override("font_size", 12)
+		capacity.add_theme_font_size_override("font_size", 14)
 		_telemetry.add_child(capacity)
 	elif mission.get("targetOrbit", "") in ["GEO", "GTO"]:
 		var capacity := Label.new()
 		capacity.text = "GTO capacity: %.0f kg" % stats.launcher_capacity_kg
-		capacity.add_theme_font_size_override("font_size", 12)
+		capacity.add_theme_font_size_override("font_size", 14)
 		_telemetry.add_child(capacity)
 	_add_telemetry("Mass", "%.2f / %.2f kg (%.1f%% margin)" % [stats.wet_mass_kg, stats.launcher_capacity_kg, stats.mass_margin_pct], stats.wet_mass_kg, stats.launcher_capacity_kg * 0.9, "Mass budget")
 	_add_telemetry("Volume", "%.2f / %.2f L" % [stats.internal_volume_liters, stats.volume_capacity_liters], stats.internal_volume_liters, stats.volume_capacity_liters, "Volume")
@@ -872,7 +873,7 @@ func _add_telemetry(title: String, text: String, used: float, limit: float, chec
 	var label := Label.new()
 	label.text = title + ": " + text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_font_size_override("font_size", 14)
 	label.add_theme_color_override("font_color", color)
 	_telemetry.add_child(label)
 	var bar := ProgressBar.new()

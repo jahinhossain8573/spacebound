@@ -64,7 +64,7 @@ func _label(text: String, parent: Node = null, color := Color.WHITE, font_size: 
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", roundi(font_size * 1.2))
 	(parent if parent != null else _body).add_child(label)
 	return label
 
@@ -151,7 +151,7 @@ func _mission_select() -> void:
 	if ResourceLoader.exists("res://scenes/TechTree.tscn"):
 		var rnd_btn := Button.new()
 		rnd_btn.text = "R&D Tech Tree"
-		rnd_btn.add_theme_font_size_override("font_size", 15)
+		rnd_btn.add_theme_font_size_override("font_size", 18)
 		UI.style_button(rnd_btn, "blue", 12, 4, 3)
 		rnd_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/TechTree.tscn"))
 		top.right_box.add_child(rnd_btn)
@@ -159,7 +159,7 @@ func _mission_select() -> void:
 	var exit_btn := Button.new()
 	exit_btn.text = "Main Menu"
 	exit_btn.tooltip_text = "Return to Main Menu"
-	exit_btn.add_theme_font_size_override("font_size", 14)
+	exit_btn.add_theme_font_size_override("font_size", 17)
 	UI.style_button(exit_btn, "amber", 10, 4, 3)
 	exit_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	top.right_box.add_child(exit_btn)
@@ -199,19 +199,19 @@ func _mission_select() -> void:
 
 	var speaker := Label.new()
 	speaker.text = "Flight Director — Mission Control"
-	speaker.add_theme_font_size_override("font_size", 16)
+	speaker.add_theme_font_size_override("font_size", 19)
 	speaker.add_theme_color_override("font_color", UI.KSP_AMBER)
 	banner_text_col.add_child(speaker)
 
 	_director_quote = Label.new()
 	_director_quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_director_quote.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_director_quote.add_theme_font_size_override("font_size", 16)
+	_director_quote.add_theme_font_size_override("font_size", 19)
 	_director_quote.add_theme_color_override("font_color", Color("dce4ee"))
 	banner_text_col.add_child(_director_quote)
 
 	_active_count_label = Label.new()
-	_active_count_label.add_theme_font_size_override("font_size", 14)
+	_active_count_label.add_theme_font_size_override("font_size", 17)
 	_active_count_label.add_theme_color_override("font_color", UI.KSP_AMBER)
 	banner_text_col.add_child(_active_count_label)
 
@@ -239,7 +239,7 @@ func _mission_select() -> void:
 		var tb := Button.new()
 		tb.text = "● " + pair[1] if pair[0] == "available" else pair[1]
 		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tb.add_theme_font_size_override("font_size", 14)
+		tb.add_theme_font_size_override("font_size", 17)
 		tb.pressed.connect(_set_contract_filter.bind(pair[0]))
 		tabs_row.add_child(tb)
 		_tab_buttons[pair[0]] = tb
@@ -284,7 +284,7 @@ func _mission_select() -> void:
 		b.custom_minimum_size.y = 52
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.add_theme_font_size_override("font_size", 15)
+		b.add_theme_font_size_override("font_size", 18)
 		b.pressed.connect(_select_mission.bind(mission))
 		row_wrap.add_child(b)
 		_mission_buttons[number] = b
@@ -412,7 +412,7 @@ func _select_mission(mission: Dictionary) -> void:
 	_start_button = Button.new()
 	_start_button.text = "Start test flight" if archive else ("Coming soon" if landing_pending else ("↻ Replay Mission" if completed else "✓ Enter VAB"))
 	_start_button.custom_minimum_size = Vector2(154, 46)
-	_start_button.add_theme_font_size_override("font_size", 16)
+	_start_button.add_theme_font_size_override("font_size", 19)
 	UI.style_button(_start_button, "green", 14, 8, 4)
 	_start_button.disabled = not archive and (landing_pending or not unlocked or not missing.is_empty())
 	_start_button.pressed.connect(_start_selected)
@@ -421,7 +421,7 @@ func _select_mission(mission: Dictionary) -> void:
 	var exp_lbl := Label.new()
 	exp_lbl.text = "Vega-C launch pad · No campaign payout" if archive else ("Status: Completed" if completed else ("Status: Ready" if unlocked and missing.is_empty() and not landing_pending else ("Status: Unlocked" if unlocked and landing_pending else "Status: Locked")))
 	exp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	exp_lbl.add_theme_font_size_override("font_size", 12)
+	exp_lbl.add_theme_font_size_override("font_size", 14)
 	exp_lbl.add_theme_color_override("font_color", UI.KSP_GREEN_TEXT if unlocked and missing.is_empty() else UI.KSP_AMBER)
 	action_col.add_child(exp_lbl)
 
@@ -458,7 +458,7 @@ func _select_mission(mission: Dictionary) -> void:
 		if ResourceLoader.exists("res://scenes/TechTree.tscn"):
 			var go_rnd := Button.new()
 			go_rnd.text = "Open R&D"
-			go_rnd.add_theme_font_size_override("font_size", 14)
+			go_rnd.add_theme_font_size_override("font_size", 17)
 			UI.style_button(go_rnd, "blue", 10, 4, 3)
 			go_rnd.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/TechTree.tscn"))
 			alert_row.add_child(go_rnd)

@@ -39,7 +39,7 @@ func _make_label(caption: String, x: float, width: float) -> Label:
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_override("font", MENU_FONT)
-	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_size_override("font_size", 38)
 	add_child(label)
 	return label
 

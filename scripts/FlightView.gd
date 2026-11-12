@@ -191,7 +191,7 @@ func _build_scene() -> void:
 	for level in WARP_LEVELS:
 		var wb := Button.new()
 		wb.text = "%dx" % level
-		wb.add_theme_font_size_override("font_size", 13)
+		wb.add_theme_font_size_override("font_size", 16)
 		UI.style_button(wb, "green" if level == 1 else "slate", 8, 3, 3)
 		wb.pressed.connect(set_warp.bind(level))
 		_flight_hud.warp_box.add_child(wb)
