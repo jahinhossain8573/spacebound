@@ -436,7 +436,8 @@ func _show_details() -> void:
 	var parts_tab := PanelContainer.new()
 	parts_tab.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	parts_tab.add_theme_stylebox_override("panel", UI.metallic_panel(Color("2d333d"), Color("586273"), 3, 5))
-	_label("Available Parts", parts_tab, UI.WHITE, 13)
+	var parts_caption := _label("Available Parts", parts_tab, UI.WHITE, 13)
+	parts_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_details.add_child(parts_tab)
 
 	var parts_well := PanelContainer.new()
@@ -497,7 +498,8 @@ func _show_details() -> void:
 		sc_row.add_theme_constant_override("separation", 6)
 		start_chip.add_child(sc_row)
 		sc_row.add_child(UI.icon("launch", Vector2(20, 20), UI.WHITE))
-		_label("Start (Tier %d)" % node.tier, sc_row, UI.WHITE, 13)
+		var start_caption := _label("Start (Tier %d)" % node.tier, sc_row, UI.WHITE, 13)
+		start_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 		_requires_box.add_child(start_chip)
 	else:
 		for id in node.prereqNodes:
