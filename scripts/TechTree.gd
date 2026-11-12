@@ -418,7 +418,9 @@ func _show_details() -> void:
 	hdr_col.add_theme_constant_override("separation", 2)
 	hdr_row.add_child(hdr_col)
 
-	_label(str(node.name), hdr_col, Color("a6f25c") if state in ["Owned", "Available"] else UI.WHITE, 18)
+	var heritage := str(node.get("heritage", "")).strip_edges()
+	var title := str(node.name) if heritage.is_empty() else heritage
+	_label(title, hdr_col, Color("a6f25c") if state in ["Owned", "Available"] else UI.WHITE, 18)
 	_label("%s  ·  Tier %d  ·  %s" % [node.id, node.tier, state], hdr_col, UI.KSP_CYAN if state in ["Owned", "Available"] else UI.KSP_AMBER, 13)
 
 	# Description well
@@ -429,8 +431,8 @@ func _show_details() -> void:
 	desc_col.add_theme_constant_override("separation", 6)
 	desc_well.add_child(desc_col)
 	_label(str(node.description), desc_col, Color("e3e9f0"), 14)
-	if not str(node.get("heritage", "")).is_empty():
-		_label("Heritage: " + str(node.heritage), desc_col, Color("b4bec9"), 12)
+	if not heritage.is_empty():
+		_label("Type: " + str(node.name), desc_col, Color("b4bec9"), 12)
 
 	# "Available Parts" Folder Tab + Tile Grid (matches Photo 4!)
 	var parts_tab := PanelContainer.new()
