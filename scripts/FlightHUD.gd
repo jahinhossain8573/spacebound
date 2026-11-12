@@ -49,7 +49,6 @@ var guidance_label: Label
 var guidance_hold: Button
 var map_readout: Label
 var _map_panel: PanelContainer
-var _map_markers: Array[Label] = []
 
 func setup(hud_mode: String) -> void:
 	mode = hud_mode
@@ -546,34 +545,6 @@ func set_stage_hint(text: String) -> void:
 func set_map_readout(text: String) -> void:
 	map_readout.text = text
 	_map_panel.visible = not text.is_empty()
-
-func update_map_markers(camera: Camera3D, markers: Array) -> void:
-	var occupied: Array[Rect2] = []
-	for i in markers.size():
-		if i >= _map_markers.size():
-			var label := Label.new()
-			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			label.add_theme_color_override("font_color", UI.KSP_CYAN)
-			label.add_theme_color_override("font_outline_color", Color.BLACK)
-			label.add_theme_constant_override("outline_size", 5)
-			label.add_theme_font_size_override("font_size", 17)
-			add_child(label)
-			_map_markers.append(label)
-		var label := _map_markers[i]
-		var point: Vector3 = markers[i][0]
-		var screen := camera.unproject_position(point)
-		label.visible = not camera.is_position_behind(point) and get_rect().has_point(screen)
-		if label.visible:
-			label.text = "• " + str(markers[i][1])
-			label.reset_size()
-			var area := Rect2(screen + Vector2(5.0, -8.0), label.size)
-			for previous in occupied:
-				if area.intersects(previous):
-					area.position.y = previous.end.y + 2.0
-			label.position = area.position
-			occupied.append(area)
-	for i in range(markers.size(), _map_markers.size()):
-		_map_markers[i].hide()
 
 func update_aero_readout(twr: float, mach: float, q_pa: float, g_load: float, clamped := false) -> void:
 	if aero_label == null:

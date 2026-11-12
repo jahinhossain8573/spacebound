@@ -366,12 +366,6 @@ func _update_camera() -> void:
 	_trajectory.visible = not close_return
 	_hud.map_button.text = "Focus" if _overview else "Map"
 	_hud.map_button.tooltip_text = "Follow spacecraft (M)" if _overview else "Earth–Moon overview (M)"
-	var markers := [
-		[Vector3.ZERO, "Earth"],
-		[Vector3(TRANSFER.MOON_DISTANCE_KM * SCALE, 0.0, 0.0), "Moon"],
-		[_craft.position, "Spacecraft" if flight.cruise_started else "Upper stage + spacecraft"]
-	]
-	_hud.update_map_markers(_camera, [] if close_return else markers)
 
 func toggle_map_view() -> void:
 	if flight != null:

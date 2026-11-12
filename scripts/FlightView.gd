@@ -386,7 +386,6 @@ func toggle_map_view() -> void:
 		_update_map_readout()
 	else:
 		_flight_hud.set_map_readout("")
-		_flight_hud.update_map_markers(_camera, [])
 
 func _update_map_readout() -> void:
 	var a := orbit.semi_major_axis_km
@@ -394,26 +393,15 @@ func _update_map_readout() -> void:
 	var pe := a * (1.0 - e)
 	var ap := a * (1.0 + e)
 	var period := FlightSim.orbital_period_s(a, orbit.mu)
-	var scale := FlightSim.RENDER_SCALE
-	var origin := Vector3.ZERO
-	var axis := Vector3(cos(orbit.arg_periapsis_rad), 0.0, sin(orbit.arg_periapsis_rad))
-	if is_instance_valid(shared_launch):
-		scale = 1000.0
-		origin = _marker.get_parent().to_global(_shared_center)
-		axis = Vector3(axis.z, axis.x, 0.0)
-	var markers: Array = [[_marker.global_position, "Spacecraft"]]
 	var text := "Ap %.1f km  ·  Pe %.1f km" % [ap - FlightSim.R_EARTH_KM, pe - FlightSim.R_EARTH_KM]
 	if e >= 0.001:
 		var to_ap := fposmod(period * 0.5 - orbit.time_since_periapsis_s, period)
 		var to_pe := fposmod(-orbit.time_since_periapsis_s, period)
 		var seconds := ceili(minf(to_ap, to_pe))
 		text += "\nNext %s in %d:%02d" % ["Ap" if to_ap < to_pe else "Pe", seconds / 60, seconds % 60]
-		markers.append([origin + axis * pe * scale, "Pe"])
-		markers.append([origin - axis * ap * scale, "Ap"])
 	else:
 		text += "\nNearly circular orbit"
 	_flight_hud.set_map_readout(text)
-	_flight_hud.update_map_markers(_camera, markers)
 
 func set_camera_preset(value: String) -> void:
 	if orbit == null: return

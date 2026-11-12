@@ -883,7 +883,6 @@ func toggle_map_view() -> void:
 func _update_map() -> void:
 	if not _map_view:
 		_hud_overlay.set_map_readout("")
-		_hud_overlay.update_map_markers(_camera, [])
 		return
 	var c: Dictionary = _ascent.coast
 	if _map_refresh <= 0.0:
@@ -894,14 +893,6 @@ func _update_map() -> void:
 	var period := float(c.period)
 	var to_periapsis := fposmod(-float(c.phase), period) if period > 0.0 else INF
 	var to_apoapsis := float(c.to_apoapsis)
-	var marks: Array = [[Vector3.ZERO, "Spacecraft"]]
-	var earth_center := _earth_spin.global_position
-	var periapsis_axis := Vector3(sin(float(c.arg)), cos(float(c.arg)), 0.0)
-	if pe > EARTH_RADIUS_M:
-		marks.append([earth_center + periapsis_axis * pe, "Pe"])
-	if is_finite(ap) and ap > EARTH_RADIUS_M and (_ascent.radial_speed > 0.0 or pe > EARTH_RADIUS_M):
-		marks.append([earth_center - periapsis_axis * ap, "Ap"])
-	_hud_overlay.update_map_markers(_camera, marks)
 	var readout := "Ballistic coast prediction\n"
 	if is_finite(ap):
 		readout += "Ap %.1f km  ·  Pe %.1f km" % [(ap - EARTH_RADIUS_M) / 1000.0, (pe - EARTH_RADIUS_M) / 1000.0]
