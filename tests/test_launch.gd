@@ -148,7 +148,12 @@ func run_tests() -> void:
 		shared.set_orbit(high_orbit)
 		var center_distance: float = camera.global_position.distance_to(launch._earth.global_position)
 		var limb_distance := sqrt(center_distance * center_distance - PHYSICS.R_EARTH * PHYSICS.R_EARTH)
-		check(camera.far > limb_distance and camera.near <= 0.5, "ship camera covers Earth's limb at %.0f km altitude" % altitude_km)
+		var frustum: Array[Plane] = camera.get_frustum()
+		check(frustum[1].intersect_3(frustum[2], frustum[3]) != null,
+			"ship camera has a valid far frustum corner at %.0f km altitude" % altitude_km)
+		var craft_distance: float = camera.global_position.distance_to(launch.focus_point())
+		check(camera.far > limb_distance and camera.near < craft_distance - launch.spacecraft_size(),
+			"ship camera keeps both the spacecraft and Earth's limb visible at %.0f km altitude" % altitude_km)
 	launch.queue_free()
 	await process_frame
 	check(manager.load_campaign() == OK and manager.has_launched_once, "first launch flag persisted")

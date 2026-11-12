@@ -934,7 +934,10 @@ func update_world_visibility(minimum_far := 2000000.0) -> void:
 		_earth.show_globe(_map_view)
 		if not _map_view:
 			_station.hide()
-	_camera.far = maxf(minimum_far, _earth.visible_distance_from(_camera.global_position))
+	var far_clip := maxf(minimum_far, _earth.visible_distance_from(_camera.global_position))
+	# Keep the far frustum plane distinguishable in Godot's single-precision projection.
+	_camera.near = maxf(_camera.near, far_clip / 12000000.0)
+	_camera.far = far_clip
 	_earth.update_horizon(_camera)
 
 func _unhandled_key_input(event: InputEvent) -> void:
