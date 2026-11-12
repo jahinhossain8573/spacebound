@@ -634,10 +634,10 @@ func _process_milestones() -> void:
 			"clamp_release":
 				_release_pad_clamps()
 			"stage_separation":
-				_separate_stage(at)
+				_separate_stage()
 				_refresh_stage_hud(0.0, 1.0)
 			"fairing":
-				_separate_fairings(at)
+				_separate_fairings()
 				_refresh_stage_hud(0.0, _ascent.fuel / float(_ascent.stages[1].propellantKg))
 			"payload_separation":
 				if not lunar_handoff:
@@ -645,15 +645,15 @@ func _process_milestones() -> void:
 				_finish_success()
 	_ascent.events.clear()
 
-func _separate_stage(at: float) -> void:
+func _separate_stage() -> void:
 	stage_separated = true
-	_add_debris(_stage, at, Vector2(0.0, -2.5), 0.15)
+	_add_debris(_stage, Vector2(0.0, -2.5), 0.15)
 	create_tween().tween_property(self, "focus_height", _upper_focus, 2.0)
 
-func _separate_fairings(at: float) -> void:
+func _separate_fairings() -> void:
 	fairing_separated = true
-	_add_debris(_fairing_left, at, Vector2(-4.0, 0.0), 0.6)
-	_add_debris(_fairing_right, at, Vector2(4.0, 0.0), -0.6)
+	_add_debris(_fairing_left, Vector2(-4.0, 0.0), 0.6)
+	_add_debris(_fairing_right, Vector2(4.0, 0.0), -0.6)
 
 ## The satellite leaves the upper stage, which backs away and tumbles slowly; the camera moves in.
 func _separate_payload() -> void:
@@ -674,7 +674,7 @@ func _deploy_payload() -> void:
 		if player.has_animation("deploy"): player.play("deploy")
 
 ## Separated hardware coasts on its own 64-bit trajectory under gravity.
-func _add_debris(node: Node3D, at: float, push: Vector2, spin: float) -> void:
+func _add_debris(node: Node3D, push: Vector2, spin: float) -> void:
 	node.reparent(_root3d, true)
 	var basis := _rocket.global_transform.basis
 	var vx: float = _ascent.vx + basis.x.x * push.x + basis.y.x * push.y
@@ -686,7 +686,9 @@ func _add_debris(node: Node3D, at: float, push: Vector2, spin: float) -> void:
 		"vx": vx,
 		"vy": vy,
 		"spin": spin,
-		"t": at
+		# The detached pose is sampled after the physics step. Using the event
+		# timestamp here would advance scripted debris through that step twice.
+		"t": _sim_time
 	})
 
 ## Advances each separated stage/fairing from its own clock to the current simulated time.

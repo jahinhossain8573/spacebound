@@ -217,6 +217,12 @@ func run_tests() -> void:
 	var before := state_at(launch)
 	key(launch, KEY_G)
 	check(launch._ascent.scripted and state_at(launch) == before, "G takes over a vertical ascent without resetting flight state")
+	fly_until(launch, func(): return launch.stage_separated, 200.0, PHYSICS.STEP)
+	check(launch.stage_separated and launch._stage.global_position.distance_to(launch._rocket.global_position) < 0.01,
+		"scripted separation starts the booster at its attached position")
+	launch.advance_ascent(PHYSICS.STEP)
+	check((launch._stage.global_position - launch._rocket.global_position).dot(launch._rocket.global_basis.y) < 0.0,
+		"the detached booster moves aft on the next physics step")
 	fly_until(launch, func(): return launch._ascent.stage == 1 and launch._ascent.throttle == 0.0, 800.0)
 	before = state_at(launch)
 	key(launch, KEY_G)
