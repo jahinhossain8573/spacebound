@@ -163,14 +163,6 @@ static func part_preview(item: Dictionary, custom_size := Vector2(56, 56)) -> Co
 	ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return ctrl
 
-static func crew_portrait(role: String, caption: String, custom_size := Vector2(104, 118)) -> Control:
-	var ctrl := PortraitCard.new()
-	ctrl.role = role
-	ctrl.caption = caption
-	ctrl.custom_minimum_size = custom_size
-	ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return ctrl
-
 static func mission_emblem(mission_number: int, custom_size := Vector2(44, 44), unlocked := true) -> Control:
 	var ctrl := EmblemIcon.new()
 	ctrl.mission_number = mission_number
@@ -527,59 +519,3 @@ class EmblemIcon extends Control:
 			swoop.append(c + Vector2(cos(a) * r * 0.68, sin(a) * r * 0.26).rotated(-0.45))
 		draw_polyline(swoop, Color("f5a623") if unlocked else Color("5f6670"), 1.8, true)
 		draw_circle(swoop[swoop.size() - 1], 2.5, Color.WHITE if unlocked else Color("777f8a"))
-
-
-class PortraitCard extends Control:
-	var role: String = "director"
-	var caption: String = "Flight Director"
-
-	func _draw() -> void:
-		var w := size.x
-		var h := size.y
-		draw_rect(Rect2(Vector2.ZERO, size), Color("161c24"))
-		# Background window / cabin
-		draw_rect(Rect2(4, 4, w - 8, h - 24), Color("222c38") if role == "director" else Color("1d242d"))
-		if role == "flight":
-			# Helmet ring behind crew head
-			draw_circle(Vector2(w * 0.5, h * 0.46), w * 0.36, Color("aeb8c4"))
-			draw_circle(Vector2(w * 0.5, h * 0.46), w * 0.30, Color("1a232e"))
-		else:
-			# Control room console glow behind director
-			draw_rect(Rect2(8, 10, w * 0.36, h * 0.26), Color("173a54"))
-			draw_rect(Rect2(w * 0.58, 12, w * 0.32, h * 0.22), Color("244a32"))
-		# Shoulders / suit
-		var suit_col := Color("dde3ea") if role == "director" else Color("d96b27")
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(w * 0.18, h - 22),
-			Vector2(w * 0.28, h * 0.62),
-			Vector2(w * 0.72, h * 0.62),
-			Vector2(w * 0.82, h - 22)
-		]), suit_col)
-		if role == "director":
-			# Dark vest + tie
-			draw_colored_polygon(PackedVector2Array([
-				Vector2(w * 0.30, h - 22),
-				Vector2(w * 0.35, h * 0.63),
-				Vector2(w * 0.65, h * 0.63),
-				Vector2(w * 0.70, h - 22)
-			]), Color("262d38"))
-		# Kerbal-inspired cylindrical green head
-		var head_col := Color("8ec94f")
-		draw_rect(Rect2(w * 0.35, h * 0.24, w * 0.30, h * 0.36), head_col)
-		draw_circle(Vector2(w * 0.5, h * 0.26), w * 0.15, head_col)
-		# Big expressive eyes
-		for ex: float in [0.41, 0.59]:
-			draw_circle(Vector2(w * ex, h * 0.39), w * 0.085, Color.WHITE)
-			draw_circle(Vector2(w * ex, h * 0.39), w * 0.04, Color("1a1e24"))
-		# Confident smile
-		draw_arc(Vector2(w * 0.5, h * 0.48), w * 0.075, 0.15, PI - 0.15, 12, Color("243818"), 1.8, true)
-		# Headset mic for director
-		if role == "director":
-			draw_arc(Vector2(w * 0.5, h * 0.32), w * 0.17, PI * 0.95, TAU * 0.98, 16, Color("3c4552"), 2.2, true)
-			draw_line(Vector2(w * 0.66, h * 0.40), Vector2(w * 0.55, h * 0.52), Color("3c4552"), 1.8)
-		# Nameplate strip at bottom
-		draw_rect(Rect2(0, h - 20, w, 20), Color("10141a"))
-		draw_rect(Rect2(0, 0, w, h), Color("566170"), false, 2.0)
-		var font := ThemeDB.fallback_font
-		if font:
-			draw_string(font, Vector2(4, h - 5), caption, HORIZONTAL_ALIGNMENT_CENTER, w - 8, 11, Color("d8e0ea"))

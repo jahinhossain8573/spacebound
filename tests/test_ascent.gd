@@ -54,6 +54,7 @@ func run_tests() -> void:
 			check(altitude_at(result, events.max_q) > 5.0 and altitude_at(result, events.max_q) < 20.0, "%s max-Q in the lower atmosphere" % label)
 			check(altitude_at(result, events.meco) > 40.0 and altitude_at(result, events.meco) < 130.0, "%s MECO at a realistic altitude" % label)
 	check_autopilot_recovery(data)
+	check_live_guidance(data)
 	print("Ascent failures: ", failures)
 	quit(1 if failures else 0)
 
@@ -87,3 +88,35 @@ func check_autopilot_recovery(data: Node) -> void:
 		flight.advance(ASCENT.STEP, 0.0, 0.0)
 	check(flight.failure.is_empty() and flight.radial_speed > 150.0 and flight.altitude > 5282.0
 		and flight.fuel < initial_fuel, "autopilot pulls out of the low dive using the remaining booster fuel")
+
+func check_live_guidance(data: Node) -> void:
+	var mission: Dictionary = data.get_mission(1)
+	var launcher: Dictionary = data.get_launcher(mission.requiredLauncher)
+	var flight := LIVE_ASCENT.new(launcher.ascent, 50.0, mission)
+	flight.clamped = false
+	flight.elapsed = 500.0
+	flight.stage = 1
+	flight.fairing_on = false
+	flight.fuel = float(flight.stages[1].propellantKg) * 0.35
+	flight.mass = ASCENT.stack_mass(flight.stages, 1, flight.fuel, false, 0.0, 50.0)
+	flight.pitch = 0.0
+	var periapsis := ASCENT.R_EARTH - 60000.0
+	var apoapsis := ASCENT.R_EARTH + 401000.0
+	flight.py = ASCENT.R_EARTH + 350000.0
+	flight.vx = sqrt(2.0 * ASCENT.MU * periapsis * apoapsis / (periapsis + apoapsis)) / flight.py
+	flight.vy = sqrt(ASCENT.MU * (2.0 / flight.py - 2.0 / (periapsis + apoapsis)) - flight.vx * flight.vx)
+	flight._update_conditions()
+	check(flight.guidance().contains("until periapsis clears the atmosphere"),
+		"live guidance rejects a coast even when apoapsis is high enough if periapsis intersects Earth")
+
+	flight.vy *= -1.0
+	flight._update_conditions()
+	flight.set_throttle(0.0)
+	check(flight.guidance().begins_with("Earth impact predicted") and flight.warp_limit() == 1
+		and flight.target_pitch() > 0.0, "a descending impact trajectory immediately gets a recovery cue and pitch")
+	flight.hold = true
+	flight.set_throttle(1.0)
+	while flight.elapsed < 530.0 and not flight.safe_orbit() and flight.failure.is_empty():
+		flight.advance(flight.step_size(), 0.0, 0.0)
+	check(flight.safe_orbit() and not flight.guidance().begins_with("Earth impact predicted"),
+		"following the recovery cue raises periapsis and clears the warning")

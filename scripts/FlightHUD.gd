@@ -60,7 +60,6 @@ func setup(hud_mode: String) -> void:
 	_build_top_right()
 	_build_bottom_left()
 	_build_bottom_center()
-	_build_bottom_right()
 
 func _build_top_left() -> void:
 	var wrap := VBoxContainer.new()
@@ -485,21 +484,6 @@ func _build_bottom_center() -> void:
 	navball.offset_bottom = 0
 	navball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(navball)
-
-func _build_bottom_right() -> void:
-	var crew_wrap := PanelContainer.new()
-	crew_wrap.anchor_left = 1.0
-	crew_wrap.anchor_right = 1.0
-	crew_wrap.anchor_top = 1.0
-	crew_wrap.anchor_bottom = 1.0
-	crew_wrap.offset_left = -114
-	crew_wrap.offset_right = -8
-	crew_wrap.offset_top = -128
-	crew_wrap.offset_bottom = -8
-	crew_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	crew_wrap.add_theme_stylebox_override("panel", UI.metallic_panel(Color("222830"), Color("5a6475"), 4, 3))
-	crew_wrap.add_child(UI.crew_portrait("flight", "Telemetry Ops", Vector2(100, 114)))
-	add_child(crew_wrap)
 
 func set_stage_cards(cards: Array) -> void:
 	for child in stage_cards_box.get_children():

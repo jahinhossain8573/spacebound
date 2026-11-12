@@ -183,7 +183,7 @@ func _mission_select() -> void:
 	console_vbox.add_theme_constant_override("separation", 10)
 	console_frame.add_child(console_vbox)
 
-	# Flight Director Briefing Banner (matches Gene Kerman Mission Control header)
+	# Flight Director Briefing Banner
 	var director_banner := PanelContainer.new()
 	director_banner.add_theme_stylebox_override("panel", UI.inset_well(Color("141922"), Color("414b59"), 4, 8))
 	console_vbox.add_child(director_banner)
@@ -191,8 +191,6 @@ func _mission_select() -> void:
 	var banner_row := HBoxContainer.new()
 	banner_row.add_theme_constant_override("separation", 14)
 	director_banner.add_child(banner_row)
-
-	banner_row.add_child(UI.crew_portrait("director", "Gene / Flight Dir.", Vector2(114, 122)))
 
 	var banner_text_col := VBoxContainer.new()
 	banner_text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL

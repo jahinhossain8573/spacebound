@@ -108,6 +108,9 @@ func run_tests() -> void:
 	launch.advance_ascent(0.2)
 	check(not launch._upper_flame.visible and launch._status.text.contains("COASTING"), "X cuts thrust from map view at the apoapsis cue")
 	fly_until(launch, func(): return launch._ascent.guidance().begins_with("Burn prograde"), 3000.0, 1.0)
+	launch.advance_ascent(6.0)
+	check(launch._ascent.radial_speed < 0.0 and launch._hud_overlay.guidance_label.text.begins_with("Burn prograde"),
+		"the live burn cue stays available just after apoapsis")
 	key(launch, KEY_Z)
 	fly_until(launch, func(): return launch._ascent.target_reached(), 15.0, 0.05)
 	key(launch, KEY_X)
