@@ -27,6 +27,19 @@ The 4K Falcon 9 livery uses [SpaceX vehicle photography](https://new.spacex.com/
 - Earth uses [Natural Earth land and lake geometry](https://www.naturalearthdata.com/downloads/110m-physical-vectors/) and [NASA Earth Observatory Blue Marble imagery](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/#august) by Reto Stöckli, with ocean colors adjusted. The regional Florida texture is cropped from [NASA’s August Blue Marble imagery](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/) at 500 meters per pixel. The game export retains the 20 patches and uses a continuous shell below the launch area, with relief shown in the texture.
 - Kennedy Space Center LC-39A is an original Spacebounds model with generated textures. Supplied aerial and launch photographs, a pad location map, and an in-game screenshot served as visual references. Their original URLs were unspecified.
 
+## Modular spacecraft and hardware
+
+All new spacecraft and part meshes are original Blender models. The following material was used as visual reference only. The game buses retain their configured dimensions and represent adaptable platforms.
+
+- `bus_cubesat_12u`: [NASA CAPSTONE integration photos](https://www.nasa.gov/missions/small-satellite-missions/capstones-cubesat-prepares-for-lunar-flight/).
+- `bus_microsat_50`: SSTL's [Tsinghua-1](https://www.sstl.co.uk/space-portfolio/launched-missions/2000-2009/tsinghua-1-launched-2000) and [UK-DMC2](https://www.sstl.co.uk/space-portfolio/launched-missions/2000-2009/uk-dmc2-launched-2009).
+- `bus_midsat_500`: [Blue Canyon Technologies spacecraft catalog](https://bluecanyontech.com/static/datasheet/BCT-Product-Catalog.pdf), Saturn-class platform.
+- `bus_heavy_geo_lunar` and the Ku/Ka antenna assembly: [Thales Alenia Space, Bangabandhu Satellite-1](https://www.thalesaleniaspace.com/en/news/bangabandhu-satellite-1-pride-bangladesh).
+- Deployable arrays: [MMA HaWK family](https://visitor.mmadesignllc.com/products/solar-arrays/), [Spectrolab photovoltaics](https://www.spectrolab.com/photovoltaics.html) and [Airbus solar array products](https://www.airbus.com/en/products-services/space/equipment/power/solar-array-products).
+- Imaging and sensors: [GomSpace NanoCam C1U](https://gomspace.com/UserFiles/Subsystems/datasheet/gs-ds-nanocam-c1u-18.pdf), [cosine HyperScout-2](https://www.cosine.eu/case/hyperscout-2/), [NASA LRO instruments (WAC and CRaTER)](https://science.nasa.gov/wp-content/uploads/2023/04/LRO_PSS_Talk.pptxTAGGED.pdf), [NewSpace fine sun sensor](https://www.newspacesystems.com/wp-content/uploads/2025/08/Sun-Sensor-Datasheet-206.pdf), [Rocket Lab star trackers](https://www.rocketlabusa.com/assets/Uploads/Star-trackers-product-sheet.pdf) and [ESA SMILE magnetometer](https://sci.esa.int/documents/35028/36141/1567260374869-SMILE_RedBook_ESA_SCI_2018_1.pdf).
+- Radio antenna assemblies: [EnduroSat antenna layouts](https://www.endurosat.com/products-category/antennas/), [Safran compact X-band radio](https://www.safran-group.com/products-services/x-lite-x-band-transmitter-nano-satellites) and [JPL Small Deep Space Transponder](https://www.jpl.nasa.gov/nmp/ds1/tech/transponder.html).
+- Thrusters: [L3Harris R-4D family](https://www.l3harris.com/sites/default/files/2024-10/l3harris-ar-bipropellant-rocket-engines-2.pdf), [NASA MR-103G reference](https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/20050205849.pdf) and [VACCO MiPS](https://www.vacco.com/images/uploads/pdfs/MicroPropulsionSystems.pdf).
+
 # VFX credits
 
 - The main menu vent vapor and launch pad clouds use `smoke_07.png` and `smoke_08.png`. The launch plume uses `flame_04.png`. These textures come from [Kenney Vleugels' Particle Pack](https://kenney.nl/assets/particle-pack) v1.1 under CC0 1.0, sourced from the [Calinou mirror](https://github.com/Calinou/kenney-particle-pack).

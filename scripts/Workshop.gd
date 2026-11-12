@@ -746,7 +746,8 @@ func _refresh_build() -> void:
 		var models := SPACECRAFT.place_part(part, _mounts, occupied, d)
 		for instance in models:
 			visual.add_child(instance)
-		if not models.is_empty():
+			SPACECRAFT.show_deployed(instance)
+		if MODEL_LIBRARY.has_model("parts", part.id):
 			continue
 		if part.id == "pwr_gomspace_p31u":
 			_box(visual, Vector3(d.x*0.85,d.y*0.85,d.z*0.03), Vector3(0,0,-d.z*0.52), Color("173f79"))

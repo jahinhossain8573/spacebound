@@ -4,6 +4,8 @@ const TRANSFER = preload("res://scripts/LunarTransfer.gd")
 const HUD = preload("res://scripts/FlightHUD.gd")
 const EARTH = preload("res://scripts/EarthVisual.gd")
 const UI = preload("res://scripts/UIStyle.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
+const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
 const WARP_LEVELS := [1, 10, 100, 1000, 10000]
 const SCALE := FlightSim.RENDER_SCALE
 
@@ -15,6 +17,8 @@ var _camera: Camera3D
 var _earth: EARTH
 var _trajectory: MeshInstance3D
 var _craft: MeshInstance3D
+var _probe: Node3D
+var _probe_length := 1.0
 var _parachute: Node3D
 var _splash: MeshInstance3D
 var _flash: ColorRect
@@ -44,14 +48,14 @@ func _ready() -> void:
 	_launch_elapsed = GameManager.flight_elapsed_s
 	_stats = preload("res://scripts/BuildStats.gd").new().calculate_stats(build, mission)
 	flight = TRANSFER.new(build, _stats, GameManager.initial_orbit)
-	_create_world()
+	_create_world(build)
 	_create_hud()
 	_view.resized.connect(_update_camera)
 	_redraw_path()
 	_log("In the 250 km parking orbit. Vega-C upper stage will inject toward the Moon after a 90-second coast.")
 	_refresh()
 
-func _create_world() -> void:
+func _create_world(build: Dictionary) -> void:
 	_view = SubViewportContainer.new()
 	_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_view.stretch = true
@@ -72,6 +76,7 @@ func _create_world() -> void:
 	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.environment.ambient_light_color = Color("8c9ab1")
 	environment.environment.ambient_light_energy = 0.24
+	MODEL_LIBRARY.use_sky_reflections(environment.environment)
 	world.add_child(environment)
 	_earth = EARTH.new()
 	_earth.sun = light
@@ -82,6 +87,12 @@ func _create_world() -> void:
 	world.add_child(moon)
 	_craft = _sphere(0.5, Color("77e9ff"), true)
 	world.add_child(_craft)
+	_probe = SPACECRAFT.build(build.bus, build.installed_components)
+	if _probe:
+		world.add_child(_probe)
+		SPACECRAFT.show_deployed(_probe)
+		var dims := SPACECRAFT.dimensions_of(build.bus)
+		_probe_length = maxf(dims.x, maxf(dims.y, dims.z))
 	_parachute = Node3D.new()
 	_craft.add_child(_parachute)
 	var canopy := _sphere(0.8, Color("f5a35d"), false)
@@ -359,6 +370,12 @@ func _update_camera() -> void:
 	var marker_pixels := 26.0 if close_return else 12.0
 	var marker_size := marker_pixels * 2.0 * distance * tan(deg_to_rad(_camera.fov * 0.5)) / maxf(1.0, _view.size.y)
 	_craft.transform.basis = Basis(Quaternion(Vector3.UP, radial)).scaled(Vector3.ONE * marker_size)
+	if _probe:
+		_probe.visible = not _overview and flight.cruise_started and flight.elapsed < TRANSFER.ENTRY_S
+		_craft.visible = not _probe.visible
+		_probe.position = _craft.position
+		var probe_attitude := Basis.from_euler(Vector3(deg_to_rad(23.0), deg_to_rad(32.0), deg_to_rad(13.0)))
+		_probe.basis = probe_attitude.scaled(Vector3.ONE * marker_size * 1.5 / _probe_length)
 	_parachute.visible = close_return and flight.elapsed >= TRANSFER.CHUTE_S and not flight.splashed_down
 	_splash.visible = close_return and flight.splashed_down
 	_splash.position = _craft.position + radial * marker_size * 0.1

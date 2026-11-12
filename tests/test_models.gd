@@ -2,6 +2,7 @@ extends SceneTree
 
 const MODEL_CHECKS = preload("res://tests/model_checks.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
 const FIXTURE := "res://tests/fixtures/models/buses/bus_spec_fixture.glb"
 const MODELS_DIR := "res://assets/models"
 const MAX_TOTAL_BYTES := 25 * 1024 * 1024
@@ -31,8 +32,33 @@ func run_tests() -> void:
 	check_external_launcher(data, "launcher_vega_c", "Vega-C", 35.0)
 	check_external_launcher(data, "launcher_falcon_9", "Falcon 9", 70.0)
 	check_delivered_models(data)
+	check_mission_spacecraft(data)
 	print("Model failures: ", failures)
 	quit(1 if failures else 0)
+
+func check_mission_spacecraft(data: Node) -> void:
+	var exterior := {
+		2: ["inst_nanocam_c1u", "com_syrlinks_ewc27", "pwr_mma_ehawk_s"],
+		3: ["inst_hyperscout2", "com_syrlinks_ewc30", "pwr_spectrolab_m"],
+		4: ["inst_kuka_transponder_suite", "prop_aerojet_r4d15", "pwr_airbus_l"],
+		5: ["com_gd_sdst", "inst_lroc_wac", "prop_mr103g", "pwr_mma_ehawk_s", "pwr_mma_ehawk_s", "pwr_mma_ehawk_s"],
+	}
+	for number in exterior:
+		var mission: Dictionary = data.get_mission(number)
+		var bus: Dictionary = data.get_bus(mission.requiredBus)
+		var craft := MODEL_LIBRARY.instantiate("buses", bus.id)
+		check(craft != null, "Mission %d has a model for its spacecraft bus" % number)
+		if craft == null:
+			continue
+		var mounts := SPACECRAFT.mounts_of(craft)
+		var occupied := {}
+		for id in exterior[number]:
+			var part: Dictionary = data.get_part(id)
+			var models := SPACECRAFT.place_part(part, mounts, occupied, SPACECRAFT.dimensions_of(bus))
+			check(not models.is_empty(), "Mission %d mounts modeled %s" % [number, id])
+			for model in models:
+				model.free()
+		craft.free()
 
 func check_fixture(data: Node) -> void:
 	var fixture: Node3D = (load(FIXTURE) as PackedScene).instantiate()

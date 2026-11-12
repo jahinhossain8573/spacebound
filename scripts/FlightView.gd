@@ -6,6 +6,7 @@ const FLIGHT_HUD = preload("res://scripts/FlightHUD.gd")
 const UI = preload("res://scripts/UIStyle.gd")
 const EARTH_VISUAL = preload("res://scripts/EarthVisual.gd")
 const MODEL_LIBRARY = preload("res://scripts/ModelLibrary.gd")
+const SPACECRAFT = preload("res://scripts/SpacecraftAssembly.gd")
 const ORBIT_MAP_MARKER := preload("res://scripts/OrbitMapMarker.gd")
 const WARP_LEVELS := [1, 10, 100, 1000]
 var orbit: OrbitState
@@ -159,24 +160,16 @@ func _build_scene() -> void:
 	world.add_child(_marker)
 	_craft_visual = Node3D.new()
 	world.add_child(_craft_visual)
-	var craft := MeshInstance3D.new()
-	var body := BoxMesh.new()
-	body.size = Vector3(0.03, 0.03, 0.03)
-	craft.mesh = body
-	var white := StandardMaterial3D.new()
-	white.albedo_color = Color("d7e2ed")
-	craft.material_override = white
-	_craft_visual.add_child(craft)
-	for side in [-1, 1]:
-		var wing := MeshInstance3D.new()
-		var panel := BoxMesh.new()
-		panel.size = Vector3(0.04, 0.018, 0.002)
-		wing.mesh = panel
-		wing.position.x = side * 0.035
-		var solar := StandardMaterial3D.new()
-		solar.albedo_color = Color("235899")
-		wing.material_override = solar
-		_craft_visual.add_child(wing)
+	if not is_instance_valid(shared_launch):
+		var build: Dictionary = GameManager.current_build
+		var bus: Dictionary = build.get("bus", GlobalData.get_bus(mission.get("requiredBus", "bus_cubesat_1u_3u")))
+		if not bus.is_empty():
+			var craft := SPACECRAFT.build(bus, build.get("installed_components", []))
+			if craft:
+				_craft_visual.add_child(craft)
+				SPACECRAFT.show_deployed(craft)
+				var dims := SPACECRAFT.dimensions_of(bus)
+				craft.scale = Vector3.ONE * (0.03 / maxf(dims.x, maxf(dims.y, dims.z)))
 	_camera = Camera3D.new()
 	_camera.current = true
 	_camera.far = 10000.0

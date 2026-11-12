@@ -9,6 +9,7 @@ const MOUNTS := ["mount_top", "mount_bottom", "mount_front", "mount_back", "moun
 const LONG_FACES := ["mount_left", "mount_right", "mount_top", "mount_bottom"]
 const END_PLATES := ["com_endurosat_uhf"]
 const P31U := "pwr_gomspace_p31u"
+const EHAWK := "pwr_mma_ehawk_s"
 const P31U_FIT := Vector2(0.017, 0.04)
 
 ## The spacecraft built from models, in metres with the bus centred on the origin, or null when
@@ -23,6 +24,14 @@ static func build(bus: Dictionary, parts: Array) -> Node3D:
 		for instance in place_part(part, mounts, occupied, dimensions_of(bus)):
 			root.add_child(instance)
 	return root
+
+## Preview the deployed configuration without starting a flight animation.
+static func show_deployed(root: Node3D) -> void:
+	for player: AnimationPlayer in root.find_children("*", "AnimationPlayer", true, false):
+		if player.has_animation("deploy"):
+			player.play("deploy")
+			player.seek(player.get_animation("deploy").length, true)
+			player.pause()
 
 static func mounts_of(bus_root: Node3D) -> Dictionary:
 	var mounts := {}
@@ -42,7 +51,7 @@ static func place_part(part: Dictionary, mounts: Dictionary, occupied: Dictionar
 	var placed: Array[Node3D] = []
 	if not MODEL_LIBRARY.has_model("parts", part.id):
 		return placed
-	var wanted := 2 if part.id == P31U or _is_wing(part) else 1
+	var wanted := 2 if part.id == P31U or (_is_wing(part) and part.id != EHAWK) else 1
 	for mount_name in _preferred_mounts(part):
 		if placed.size() == wanted:
 			break
@@ -67,6 +76,8 @@ static func _preferred_mounts(part: Dictionary) -> Array:
 		return ["mount_front", "mount_back"]
 	if part.get("thrustNewtons", 0.0) > 0.0:
 		return ["engine_mount"]
+	if part.id == EHAWK:
+		return ["array_hinge_left", "array_hinge_right", "mount_back", "mount_top"]
 	if _is_wing(part):
 		return ["array_hinge_left", "array_hinge_right"]
 	match part.subsystem:

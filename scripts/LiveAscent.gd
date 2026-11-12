@@ -6,6 +6,8 @@ const ATMOSPHERE_M := 130000.0
 const CIRCULAR_TOLERANCE_M := 25000.0
 const RECOVERY_CEILING_M := 105000.0
 const LATE_BURN_WINDOW_S := 10.0
+const RECOVERY_LOOKAHEAD_S := 20.0
+const RECOVERY_CLEAR_CLIMB_MPS := 40.0
 
 var stages: Array
 var target: Dictionary
@@ -55,6 +57,7 @@ var _circularizing := false
 var _recovery := false
 var _booster_recovery := false
 var _upper_recovery := false
+var _commanded_pitch := PI * 0.5
 
 func _init(ascent: Dictionary, payload_kg: float, mission: Dictionary) -> void:
 	stages = ascent.stages
@@ -90,6 +93,7 @@ func advance(dt: float, turn: float, throttle_rate: float) -> void:
 	var radius := sqrt(px * px + py * py)
 	var up_x := px / radius
 	var up_y := py / radius
+	_commanded_pitch = rotate_toward(_commanded_pitch, _desired_pitch(), PHYSICS.MAX_PITCH_RATE * dt)
 	var desired := target_pitch() if scripted or hold else pitch + turn * PHYSICS.MAX_PITCH_RATE * dt
 	pitch = PI * 0.5 if clamped else rotate_toward(pitch, desired, PHYSICS.MAX_PITCH_RATE * dt)
 	mass = PHYSICS.stack_mass(stages, stage, fuel, fairing_on, _fairing_mass, _payload_mass)
@@ -239,6 +243,12 @@ func target_reached(precise := false) -> bool:
 	return safe_orbit() and absf(coast.periapsis - pe) <= pe_tolerance and absf(coast.apoapsis - float(target.apogee)) <= ap_tolerance and horizontal_speed > 0.0
 
 func target_pitch() -> float:
+	return _commanded_pitch
+
+func _desired_pitch() -> float:
+	# Keep the same steering reference through booster cutoff and separation.
+	if (stage == 0 and throttle == 0.0) or not engine_lit:
+		return _commanded_pitch
 	if stage == 0:
 		var gravity_turn := PHYSICS.booster_pitch(altitude, airspeed, air_path, _kick)
 		if _booster_recovery or _needs_booster_recovery():
@@ -259,28 +269,34 @@ func target_pitch() -> float:
 	if safe_orbit() and (_circularizing or _coast_to_burn or _near_burn_window()):
 		# Level at apoapsis, with a small radial correction if the burn starts early or late.
 		return clampf(-radial_speed / maxf(circularization_dv(), 70.0), -0.18, 0.18)
-	if not engine_lit:
-		return air_path if altitude < 50000.0 else orbit_path
 	var engine: Dictionary = stages[stage]
 	return PHYSICS.upper_stage_pitch(
-		pitch, altitude + PHYSICS.R_EARTH, radial_speed, horizontal_speed,
+		_commanded_pitch, altitude + PHYSICS.R_EARTH, radial_speed, horizontal_speed,
 		PHYSICS.ambient_thrust(engine, altitude) / mass, mass,
 		PHYSICS.propellant_flow(engine), float(engine.ispVacuumS), target
 	)
 
 func _needs_upper_recovery() -> bool:
-	return (stage > 0 and engine_lit and fuel > 0.0 and radial_speed < 0.0
-		and not safe_orbit() and coast.energy < 0.0
-		and (_upper_recovery or throttle == 0.0 or altitude < 75000.0 or coast.apoapsis >= float(target.apogee)))
+	if stage == 0 or not engine_lit or fuel <= 0.0 or safe_orbit() or coast.energy >= 0.0:
+		return false
+	if _upper_recovery:
+		return altitude < RECOVERY_CEILING_M or radial_speed < RECOVERY_CLEAR_CLIMB_MPS
+	# Begin recovery before a powered descent reaches the old low-altitude threshold.
+	var projected_altitude := altitude + radial_speed * RECOVERY_LOOKAHEAD_S
+	return radial_speed < 0.0 and (
+		throttle == 0.0 or projected_altitude < 75000.0 or coast.apoapsis >= float(target.apogee)
+	)
 
 func _upper_recovery_pitch() -> float:
 	# Raise periapsis with tangential thrust while arresting descent near the atmosphere.
 	var radius := PHYSICS.R_EARTH + altitude
 	var effective_gravity := PHYSICS.MU / (radius * radius) - horizontal_speed * horizontal_speed / radius
 	var drag := PHYSICS.drag_acceleration(pressure, mach, _area, mass, airspeed)
-	var arrest_time := clampf((altitude - ATMOSPHERE_M) / -radial_speed, 5.0, 30.0)
+	var arrest_time := clampf((altitude - ATMOSPHERE_M) / maxf(-radial_speed, 1.0), 5.0, 30.0)
+	var climb_target := 80.0 * (1.0 - smoothstep(75000.0, ATMOSPHERE_M, altitude))
 	var thrust_accel := PHYSICS.ambient_thrust(stages[stage], altitude) / mass
-	return asin(clampf((effective_gravity + drag * radial_speed - radial_speed / arrest_time) / thrust_accel, 0.0, 1.0))
+	var radial_accel := (climb_target - radial_speed) / arrest_time
+	return asin(clampf((effective_gravity + drag * radial_speed + radial_accel) / thrust_accel, 0.0, 1.0))
 
 func _needs_booster_recovery() -> bool:
 	return not clamped and altitude >= PHYSICS.VERTICAL_CLEAR_ALTITUDE and (
@@ -342,7 +358,8 @@ func _ready_to_coast() -> bool:
 	return coast.periapsis >= periapsis_floor if target.circularize else coast.periapsis < periapsis_floor
 
 func warp_limit() -> int:
-	if _near_burn_window() or _needs_upper_recovery():
+	var staging := (stage == 0 and not clamped and throttle == 0.0) or not engine_lit
+	if staging or _near_burn_window() or _needs_upper_recovery():
 		return 1
 	if clamped or altitude < 70000.0 or (engine_lit and throttle > 0.0) or (stage == 0 or not engine_lit):
 		return 10
@@ -377,7 +394,7 @@ func _script_controls() -> void:
 		next_stage()
 		return
 	if coast.energy >= 0.0 or _recovery:
-		set_throttle(1.0 if absf(angle_difference(pitch, target_pitch())) < deg_to_rad(12.0) else 0.0)
+		set_throttle(1.0 if absf(angle_difference(pitch, _desired_pitch())) < deg_to_rad(12.0) else 0.0)
 		return
 
 	if _needs_upper_recovery():
@@ -401,7 +418,7 @@ func guidance() -> String:
 		return "Hold vertical while the engines spool."
 	if stage == 0:
 		if fuel <= 0.0:
-			return "Booster cutoff. Use the staging panel to separate."
+			return "Booster cutoff. Separate as soon as staging unlocks."
 		if throttle == 0.0:
 			return "Booster still has fuel. Press Z to resume the ascent."
 		if altitude < PHYSICS.VERTICAL_CLEAR_ALTITUDE or airspeed < PHYSICS.VERTICAL_RISE_SPEED:
@@ -412,7 +429,7 @@ func guidance() -> String:
 			return "Pitch toward downrange and follow the target marker through Max-Q."
 		return "Past Max-Q. Follow the gravity turn until booster cutoff."
 	if not engine_lit:
-		return "Ignite the upper stage once the booster clears."
+		return "Ignite the upper stage as soon as staging unlocks."
 	if _needs_upper_recovery() or (fuel > 0.0 and throttle == 0.0 and coast.energy < 0.0 and not safe_orbit()):
 		var hazard := "Earth impact" if coast.periapsis <= PHYSICS.R_EARTH else "Atmospheric entry"
 		return "%s predicted if coasting. Follow the pitch marker and apply full thrust with Z." % hazard

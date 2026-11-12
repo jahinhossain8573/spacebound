@@ -55,6 +55,7 @@ func run_tests() -> void:
 			check(altitude_at(result, events.meco) > 40.0 and altitude_at(result, events.meco) < 130.0, "%s MECO at a realistic altitude" % label)
 	check_autopilot_recovery(data)
 	check_live_guidance(data)
+	check_staging_guidance(data)
 	print("Ascent failures: ", failures)
 	quit(1 if failures else 0)
 
@@ -100,6 +101,7 @@ func check_live_guidance(data: Node) -> void:
 	flight.fuel = float(flight.stages[1].propellantKg) * 0.35
 	flight.mass = ASCENT.stack_mass(flight.stages, 1, flight.fuel, false, 0.0, 50.0)
 	flight.pitch = 0.0
+	flight._commanded_pitch = flight.pitch
 	var periapsis := ASCENT.R_EARTH - 60000.0
 	var apoapsis := ASCENT.R_EARTH + 401000.0
 	flight.py = ASCENT.R_EARTH + 350000.0
@@ -112,11 +114,45 @@ func check_live_guidance(data: Node) -> void:
 	flight.vy *= -1.0
 	flight._update_conditions()
 	flight.set_throttle(0.0)
-	check(flight.guidance().begins_with("Earth impact predicted") and flight.warp_limit() == 1
-		and flight.target_pitch() > 0.0, "a descending impact trajectory immediately gets a recovery cue and pitch")
+	check(flight.guidance().begins_with("Earth impact predicted") and flight.warp_limit() == 1,
+		"a descending impact trajectory immediately gets a recovery cue")
 	flight.hold = true
 	flight.set_throttle(1.0)
+	flight.advance(ASCENT.STEP, 0.0, 0.0)
+	check(flight.target_pitch() > 0.0 and flight.target_pitch() <= ASCENT.MAX_PITCH_RATE * ASCENT.STEP,
+		"the pitch marker starts recovery at a rate the rocket can follow")
 	while flight.elapsed < 530.0 and not flight.safe_orbit() and flight.failure.is_empty():
 		flight.advance(flight.step_size(), 0.0, 0.0)
 	check(flight.safe_orbit() and not flight.guidance().begins_with("Earth impact predicted"),
 		"following the recovery cue raises periapsis and clears the warning")
+
+	flight.py = ASCENT.R_EARTH + 90000.0
+	flight.px = 0.0
+	flight.vx = 6000.0
+	flight.vy = -850.0
+	flight._upper_recovery = false
+	flight._update_conditions()
+	check(flight.guidance().begins_with("Earth impact predicted"),
+		"powered descent triggers recovery before reaching the low-altitude threshold")
+
+func check_staging_guidance(data: Node) -> void:
+	var mission: Dictionary = data.get_mission(1)
+	var launcher: Dictionary = data.get_launcher(mission.requiredLauncher)
+	var flight := LIVE_ASCENT.new(launcher.ascent, 50.0, mission)
+	flight.scripted = true
+	var coast_pitch := NAN
+	var largest_step := 0.0
+	var coast_stable := true
+	while flight.elapsed < 250.0 and flight.failure.is_empty():
+		var before := flight.target_pitch()
+		var dt := flight.step_size()
+		flight.advance(dt, 0.0, 0.0)
+		largest_step = maxf(largest_step, absf(angle_difference(before, flight.target_pitch())) / dt)
+		if flight.stage == 1 and not flight.engine_lit:
+			if is_nan(coast_pitch):
+				coast_pitch = before
+			coast_stable = coast_stable and is_equal_approx(coast_pitch, flight.target_pitch())
+	check(not is_nan(coast_pitch) and coast_stable and flight.stage == 1 and flight.engine_lit,
+		"the commanded attitude holds through separation and into the ignition handoff")
+	check(largest_step <= ASCENT.MAX_PITCH_RATE + 0.000001,
+		"the live pitch marker stays within the rocket's turn rate through staging and powered flight")
