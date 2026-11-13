@@ -1,0 +1,73 @@
+name: Deploy Spacebounds to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Godot and the threadless Web release template
+        run: |
+          release="Godot_v${GODOT_VERSION}-stable"
+          download_url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          templates="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
+          mkdir -p "$RUNNER_TEMP/godot" "$templates"
+          curl --fail --location --retry 3 "$download_url/${release}_linux.x86_64.zip" -o "$RUNNER_TEMP/godot.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
+          mv "$RUNNER_TEMP/godot/${release}_linux.x86_64" "$RUNNER_TEMP/godot/godot"
+          chmod +x "$RUNNER_TEMP/godot/godot"
+          echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
+
+          curl --fail --location --retry 3 "$download_url/${release}_export_templates.tpz" -o "$RUNNER_TEMP/templates.tpz"
+          unzip -jq "$RUNNER_TEMP/templates.tpz" 'templates/version.txt' 'templates/web_nothreads_release.zip' -d "$templates"
+
+      - name: Export the Web build
+        shell: bash
+        run: |
+          mkdir -p build/web
+          touch build/.gdignore
+          godot --headless --path . --import
+          godot --headless --path . --export-release Web 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
+          if grep -q '^ERROR:' "$RUNNER_TEMP/godot-export.log"; then
+            exit 1
+          fi
+          for file in index.html index.js index.pck index.wasm; do
+            test -s "build/web/$file"
+          done
+
+      - name: Upload the Web build
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

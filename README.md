@@ -30,7 +30,9 @@ Package every generated Web file with `index.html` at the archive root:
 (cd build/web && zip -r ../spacebounds-web.zip .)
 ```
 
-Upload the complete ZIP when hosting is enabled later. It contains the HTML shell, JavaScript, WebAssembly, PCK data, icons, splash image, and audio worklets. `build/` is ignored by Git.
+The ZIP contains the HTML shell, JavaScript, WebAssembly, PCK data, icons, splash image, and audio worklets. `build/` is ignored by Git.
+
+For GitHub Pages, select **GitHub Actions** under **Settings → Pages → Source**. The [Pages workflow](.github/workflows/pages.yml) builds and publishes `build/web` after pushes to `master`. You can also run it manually from the Actions tab.
 
 The Windows Desktop preset targets x86-64 at `build/windows/Spacebounds.exe`:
 
