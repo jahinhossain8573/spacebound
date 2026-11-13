@@ -8,7 +8,7 @@ func _ready() -> void:
 
 	var title := Label.new()
 	title.name = "Title"
-	title.text = "SPACEBOUND"
+	title.text = "SPACEBOUNDS"
 	title.position = Vector2(64, 48)
 	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
