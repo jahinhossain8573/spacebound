@@ -1,5 +1,7 @@
 [2026 NASA Space Apps Challenge project page](https://www.spaceappschallenge.org/2026/find-a-team/steller-legion/)
 
+[Play Spacebounds in your browser](https://jahinhossain8573.github.io/spacebound/)
+
 # Spacebounds
 
 Spacebounds is a browser-playable satellite engineering and orbital flight simulator built by Stellar Legion for the 2026 NASA Space Apps Challenge, **Space Mission Design Game**. It introduces students to spacecraft design and orbital mechanics through missions inspired by Bangladesh’s space program and regional challenges.
