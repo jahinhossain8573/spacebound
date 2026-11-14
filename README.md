@@ -1,174 +1,51 @@
-# spacebounds
+[2026 NASA Space Apps Challenge project page](https://www.spaceappschallenge.org/2026/find-a-team/steller-legion/)
 
-Open `project.godot` with Godot 4.7.2 stable (Steam) and run the project. The project uses the Compatibility renderer for web support.
+# Spacebounds
 
-The default UI theme uses Roboto, licensed under the SIL Open Font License; see `assets/fonts/OFL.txt`. Theme colors are available under the `Spacebounds` type as `accent`, `warning`, and `failure`.
+Spacebounds is a browser-playable satellite engineering and orbital flight simulator built by Stellar Legion for the 2026 NASA Space Apps Challenge, **Space Mission Design Game**. It introduces students to spacecraft design and orbital mechanics through missions inspired by Bangladesh’s space program and regional challenges.
 
-Run the data checks with `godot --headless --path . --script res://tests/test_data.gd`.
+[Watch the project walkthrough](https://www.youtube.com/watch?v=P_-SGncbpRg)
 
-## Building and deploying
+## How to play
 
-Use Godot **4.7.2 stable** with its matching official export templates. In the editor, open **Editor → Manage Export Templates** and install version 4.7.2; alternatively install the matching TPZ from the [official release](https://github.com/godotengine/godot/releases/tag/4.7.2-stable). This machine has the Web threadless and Windows x86-64 debug/release templates installed under `~/Library/Application Support/Godot/export_templates/4.7.2.stable/`.
+1. **Choose a contract.** Review the target orbit, required payload, and budget in Mission Control.
+2. **Build a spacecraft.** Assemble a satellite in the 3D Workshop using components based on real hardware. Track mass, internal volume, solar power, battery endurance during eclipse, maneuver capability (Δv), and cost.
+3. **Pass the Flight Readiness Review.** Resolve issues with payload fit, launch mass, power, propulsion, and required equipment before liftoff.
+4. **Launch and operate in orbit.** Fly a guided or manual ascent, separate the rocket stages, and deploy the satellite. Perform orbital burns, manage power through eclipse, and downlink mission data.
+5. **Review and upgrade.** Check your score and flight log in the debrief. Earn funds and spend Science Points in the Technology Tree to unlock hardware for future missions.
 
-The commands below assume the Godot executable is available as `godot`. On this Mac it is `/Volumes/860 EVO/SteamLibrary/steamapps/common/Godot Engine/Godot.app/Contents/MacOS/Godot`.
+## Missions
+
+| Mission | Objective |
+| --- | --- |
+| First Signal | Recreate the BRAC Onnesha mission by launching a CubeSat into low Earth orbit and sending a beacon to Betbunia ground station. |
+| Orbital Sentinel | Observe the Bay of Bengal and downlink imagery via S-band. |
+| Delta Flood Watch | Use multispectral imaging from a Sun-synchronous orbit to map monsoon flooding in Bangladesh. |
+| Geostationary Gateway | Take inspiration from Bangladesh Satellite-1 and circularize a communications satellite into geostationary orbit. |
+| Cislunar Pathfinder | Correct a lunar flyby trajectory, capture imagery, and return to Earth. |
+| Lunar Touchdown | Attempt a powered soft landing on the Moon in this stretch mission. |
+
+## Run locally
+
+Open `project.godot` in **Godot 4.7.2** and press **F5**. Spacebounds uses GDScript and the Compatibility renderer.
+
+To build and serve the Web version locally, install the matching Godot export templates, then run:
 
 ```sh
-godot --headless --path . --script res://tests/test_data.gd
-mkdir -p build/web build/windows
+mkdir -p build/web
 touch build/.gdignore
 godot --headless --path . --export-release "Web"
 python3 -m http.server 8000 --bind 127.0.0.1 --directory build/web
 ```
 
-Open `http://127.0.0.1:8000/` in a browser; opening `index.html` directly does not work. The current main menu intentionally shows an empty navy canvas. Stop the server with Ctrl+C.
+Open [localhost:8000](http://127.0.0.1:8000/) in your browser. The [GitHub Pages workflow](.github/workflows/pages.yml) also builds and publishes the Web export. For Windows, create `build/windows` and export using the **Windows Desktop** preset.
 
-The Web preset exports to `build/web/index.html` using Compatibility, with threads, extensions, and PWA caching disabled. It requires no cross-origin isolation headers. Both presets explicitly include the JSON catalogs and font license, and exclude tests, planning documents, and build output.
+## Data and credits
 
-Package every generated Web file with `index.html` at the archive root:
+The project page lists these resources:
 
-```sh
-(cd build/web && zip -r ../spacebounds-web.zip .)
-```
+- NASA spacecraft and mission data from the [Small Spacecraft Systems Virtual Institute](https://www.nasa.gov/smallsat-institute/), [NASA Technical Reports Server](https://ntrs.nasa.gov/), and [NSSDCA Master Catalog](https://nssdc.gsfc.nasa.gov/nmc/).
+- Earth imagery and geography from [NASA Blue Marble](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/) and [Natural Earth](https://www.naturalearthdata.com/downloads/110m-physical-vectors/).
+- Additional spacecraft references from the [ESA SMILE Technical Red Book](https://sci.esa.int/documents/35028/36141/1567260374869-SMILE_RedBook_ESA_SCI_2018_1.pdf) and [General Catalog of Artificial Space Objects](https://planet4589.org/space/gcat/).
 
-The ZIP contains the HTML shell, JavaScript, WebAssembly, PCK data, icons, splash image, and audio worklets. `build/` is ignored by Git.
-
-For GitHub Pages, select **GitHub Actions** under **Settings → Pages → Source**. The [Pages workflow](.github/workflows/pages.yml) builds and publishes `build/web` after pushes to `master`. You can also run it manually from the Actions tab.
-
-The Windows Desktop preset targets x86-64 at `build/windows/Spacebounds.exe`:
-
-```sh
-godot --headless --path . --export-release "Windows Desktop"
-```
-
-Windows execution testing remains for the final release issue.
-
-### SPA-7 validation — 2026-11-08
-
-- Godot 4.7.2 data checks and release Web export passed. The malformed-file diagnostics in the data test are intentional.
-- The exported PCK was opened independently of the source folder: all four catalogs (3 launchers, 5 buses, 34 components, 6 missions) and the font license were present; tests and planning documents were excluded.
-- Chrome for Testing 157.0.8103.38 completed startup and resized to 1280×720 and 900×900. The navy canvas filled both viewports with no console errors or failed requests. Screenshots and console logs are in `build/checks/`.
-- Firefox validation is **blocked**: the temporary Firefox 159.0 Playwright build cannot load a profile, including when opened through the desktop launcher. It fails before loading the game. Repeat the browser smoke test in a working Firefox installation before marking that acceptance item complete.
-- Public hosting is **deferred**. No public URL is available, and the public deployment acceptance item remains open.
-
-## FlightSim calculations
-
-Run the physics checks with `godot --headless --path . --script res://tests/test_flightsim.gd`. Each check prints PASS/FAIL, and failures exit with status 1.
-
-`FlightSim` provides pure rocket, orbit, burn, eclipse, and battery calculations. Orbital distances and apsis radii are in kilometres from the body's center; orbital speeds are km/s. Rocket delta-v is m/s, mass is kg, Isp and time are seconds, power is watts, and battery capacity is Wh. The tangential-burn helper assumes zero radial velocity at the burn point; unbound results contain only `escaped: true`.
-
-Mission skipping starts from the current battery charge and orbital phase, processes sunlight and eclipse, and truncates the final orbit to the requested duration. Reaching zero charge fails; `failed_orbit` is one-based, or -1 on survival. Orbit propagation supports ellipses (`0 <= eccentricity < 1`), with periapsis on +x; invalid elements return `Vector2.ZERO`.
-
-Validated on Godot 4.7.2: all 43 physics checks, the existing data suite, and the project startup smoke check pass.
-
-## 3D assets
-
-Models follow [the 3D asset specification](docs/art/3d-asset-spec.md): real-scale `.glb` files at `assets/models/<category>/<id>.glb`, with Blender sources in `art_source/`, which Godot ignores. Export with `art_source/tools/sb_export.py` and load through `scripts/ModelLibrary.gd`, which returns `null` until a model exists. After importing (`godot --headless --path . --import`), run `godot --headless --path . --script res://tests/test_models.gd` to check every delivered model against the spec.
-
-## Workshop preview
-
-Open `scenes/Workshop.tscn` in Godot and run the scene (F6), or run `godot --path . res://scenes/Workshop.tscn`. With no selected campaign mission, it previews Mission 1. Right-drag to orbit, scroll to zoom, or click the 3D view and use the arrow keys and +/-; Reset view restores the camera. Launch is enabled when the readiness review has no failures.
-
-Run the assembly checks with `godot --headless --path . --script res://tests/test_workshop.gd`. Workshop, data, and FlightSim headless checks pass on Godot 4.7.2. A temporary Compatibility Web export loaded in the in-app browser; adding/removing a part and keyboard camera rotation were visually checked. Native scene startup was checked, but native visual interaction, browser scrolling, and resize remain to be verified.
-
-## Campaign flow
-
-New Campaign initializes and saves a new agency; Continue restores `user://save.json`. Mission Select opens the Workshop, and later flight scenes can provide `GameManager.last_result` and enter `scenes/Debrief.tscn` for scoring and settlement. A running mission must be started with `GameManager.start_mission(number)` so the debrief has its attempt identity. Reopening the same debrief does not pay twice. Failed saves can be retried.
-
-Run campaign tests with `godot --headless --path . --script res://tests/test_campaign.gd`. The deliberately corrupt-save case prints a JSON parse error. The campaign, Workshop, FlightSim, and data suites pass on Godot 4.7.2. An isolated Web fixture verified a successful debrief, Mission 2 unlock, saved balances after reload, Workshop navigation, and debug controls; F9 was also checked in a release export. Native visual interaction remains unverified.
-
-## Readiness review
-
-Workshop telemetry updates as parts and propellant change. Run Readiness Review to see individual failures and advisories; Launch requires no failures. Launch saves an independent build snapshot and opens the launch sequence.
-
-Run checks with `godot --headless --path . --script res://tests/test_readiness.gd`. The readiness, Workshop, campaign, FlightSim, and data tests pass on Godot 4.7.2. An isolated Web preview was checked for the report, Mission 1 assembly, live updates, and launch handoff. Native visual interaction and browser resize/scroll checks remain unverified.
-
-`GameManager.current_build` holds `launcher`, `bus`, `installed_components`, `propellant_mass_kg`, and `stats`; stats include power, battery, mass, volume, delta-v, cost, and landing TWR. Mission 7 landing mass uses the 2,600 m/s pre-landing handoff from SPA-23.
-
-## Flight preview
-
-Run `godot --path . res://scenes/FlightView.tscn` (or F6 in the editor). It previews Mission 1 when no mission is selected. Choose 1/10/100/1000x warp and toggle between spacecraft and map views with M. Right-drag or use arrows over the viewport to rotate, and scroll or use +/- to zoom. Battery simulation and mission completion are active; orbital burns are planned separately.
-
-`GameManager.initial_orbit` accepts an `OrbitState` handoff; FlightView copies it. `FlightView.set_orbit()` validates and redraws an orbit without resetting total elapsed time. Lunar missions require their dedicated flight scenes.
-
-Run `godot --headless --path . --script res://tests/test_orbit.gd`. All orbit and existing regression suites pass on Godot 4.7.2. Native rendering was captured in `build/checks/flight-native.png`; Web rendering, warp, camera presets, keyboard rotation, and the eclipse indicator were visually checked. Browser resizing and native interactive controls remain unverified.
-
-## Launch sequence
-
-A ready Workshop build opens the launch countdown. Press Space or Launch now to ignite; subsequent successful launches can skip the ascent. Failed launches cannot be skipped. In debug builds, F9 offers mutually exclusive reliability overrides. Lunar destinations remain unavailable until their dedicated scenes exist.
-
-Run `godot --headless --path . --script res://tests/test_launch.gd`. Launch, orbit, readiness, campaign, Workshop, physics, and data checks passed on Godot 4.7.2. An isolated native capture and temporary Web preview showed the rocket, staging, fairing separation, and flight handoff. Interactive native controls, browser resizing, failure visuals, and frame pacing still need manual verification.
-
-## Battery and mission-time skip
-
-FlightView now charges batteries in sunlight and drains them in eclipse, including at high time warp. Below 15%, the bar flashes red with LOW BATTERY. Depletion stops simulation and opens Debrief after three seconds. Orbit-only previews display battery availability without settling campaign results.
-
-Skip mission time starts from the current charge and orbital phase, emits `GameManager.mission_skip_started(remaining_s)` before calculation, and animates the clock and minimum battery display over three seconds. Mission 4 requires circular GEO before skip is enabled; its maneuver implementation remains a later issue. The helper accepts optional `start_wh` and sunlight-first `phase_s` arguments while preserving existing callers. Minimum battery percentage is passed to campaign scoring.
-
-Run `godot --headless --path . --script res://tests/test_power.gd`. All 16 power checks and existing data, physics, Workshop, readiness, campaign, orbit, and launch suites pass. A temporary Web Mission 1 fixture verified the battery HUD, skip animation, Debrief, payout, and Tier 1 unlock. Native visual interaction, low-battery flashing, and failure presentation remain manually unverified. Alarm audio and event effects belong to later issues.
-
-## Fuel balance
-
-The fuel slider covers the build's remaining allowance, accounting for bus volume, propellant density and ullage, tank and adapter mass, the 10% launch margin, and mission budget. The numeric control still accepts larger amounts for experimentation; the allowance message explains overloads. Missions 1–3 require no spacecraft fuel because their launchers provide the starting orbit.
-
-Run `godot --headless --path . --script res://tests/test_balance.gd` for full readiness checks using parts available at each mission's tier. Example passing fuel amounts are 0.5 kg (optional Mission 1 cold gas), 0 kg (Missions 2–3), 394.694 kg (Mission 4), 0.793 kg (Mission 5), and 840.082 kg (Mission 7). The test lists the complete part combinations. No catalog masses or launcher capacities were changed. Balance, Workshop, readiness and physics checks passed; the revised slider has not been visually checked.
-
-## Continuous launch and flight
-
-The ascent and orbital flight share the same Earth, spacecraft, viewport, and camera. The launch station is hidden during ascent; insertion preserves the craft's position and camera framing. Press M to switch between flight and map view. Right-drag rotates, the wheel zooms, and middle-drag pans the map.
-
-Ignite and advance stages from the lower-left flight panel. Use WASD to steer the nose within the flight plane, Shift/Ctrl to adjust throttle, Z for full throttle, and X for cutoff. The map shows where the craft would coast and when it will reach the next apsis. Flight guidance shows the target pitch and burn cues. The steering hold follows the target until you steer manually. Disable guidance in Main Menu → Settings.
-
-The live ascent reuses the planar thrust, propellant consumption, gravity, atmospheric drag, and launch-site rotation in `scripts/AscentSim.gd`. Staging drops mass and releases ballistic debris. Payload deployment hands the achieved orbit to orbital operations. For demonstrations, G toggles scripted control using the current flight state.
-
-Run `godot --headless --path . --script res://tests/test_launch.gd` for guided manual insertion, staging, map controls, and scripted takeover. The scripted reference trajectories are covered by `tests/test_ascent.gd`.
-
-## Mission 1
-
-The reference build uses P31u panels, BP4 battery, NanoMind A3200 computer and EnduroSat UHF on the 1U/3U bus. The first signal requires a complete powered sunlit pass after eclipse exit; Skip can simulate it. A successful reference mission earns 92.5 points, $16M and 17 SP with existing bonus rules.
-
-Run `godot --headless --path . --script res://tests/test_mission1.gd`. Mission 1 and existing regression suites pass, and the release Web export succeeds. Public hosting remains deferred. The full native and browser campaign playthrough, reload, and resize checks remain to be verified.
-
-## Orbital burns
-
-In FlightView, enter Δv in m/s, choose prograde or retrograde, and execute. The panel shows remaining fuel, available Δv, estimated burn duration, and the predicted apsides. Wait for apoapsis or periapsis to warp to the chosen point; these controls are disabled for circular orbits. The model turns before the impulse, and fuel remains aboard the transient flight state. Escaping or unaffordable burns are rejected. Burns are planar and instantaneous; finite-duration physics and maneuver nodes are future work.
-
-Run `godot --headless --path . --script res://tests/test_burns.gd`. The burn, orbit, launch, power, Mission 1, physics, readiness, and campaign checks pass. An isolated Web preview verified entering 1,470 m/s, waiting for apoapsis, circularizing the GTO orbit, fuel reduction, and enabling mission-time Skip. Public hosting remains deferred.
-
-## Research
-
-Open Research from Mission Select to spend Science Points on parts and effects. Nodes display their tier, prerequisites, cost, unlocks, and status; unavailable future nodes are marked Post-hackathon. Tier gates open after Missions 1, 3, 4, and 5. Mission 3 grants L11 and Falcon 9 automatically. Mission launchers and buses remain fixed; research their required hardware before starting a mission.
-
-`godot --headless --path . --script res://tests/test_research.gd` checks the research path, prerequisites, save rollback and persistence, Falcon grant, and the L10 adapter effect. The source design lists 50 distinct nodes (28 enabled in the hackathon); all 50 are included. Research and existing regression suites pass, and a release Web export succeeds. An isolated browser preview verified the tree, A1 purchase, and updated balance; native interaction and browser resize remain unverified.
-
-## Flight events
-
-Six events can occur on orbit arrival, mission-time Skip, or a burn. Event popups pause flight until their outcome is acknowledged; events fire at most once per flight and their historical precedents appear in Debrief. Mission 3 always encounters the cloud event when an optical instrument is installed. Avoidance consumes 10 m/s, and engine underperformance preserves fuel use while correcting the achieved orbit. Mission extension adds 20% of base SP as well as its normal bonus; replay SP remains fixed at 25% of base.
-
-In debug builds, F9 can set an event RNG seed and force an unused event by ID. Run `godot --headless --path . --script res://tests/test_events.gd` for seeded outcome, pause, skip, fuel, radiation, extension, and save checks. All existing suites and a release Web export pass. An isolated browser preview verified the Mission 3 popup, resumed Skip, and Debrief precedent; the other event popups and native interaction have not been visually checked. Public hosting remains deferred.
-
-## Mission 2
-
-Orbital Sentinel requires a NanoCam, S-band radio, battery, and the RW-0.03 reaction wheels researched through A1. A deployable array supplies the reference build's 15.5 W load. Its four objectives cover orbit, 100 images, downlink, and 30-day survival. Images accrue once per completed sunlit pass when an optical instrument and active-pointing ADCS are installed; Skip updates the count during its animation. Cloud events block imaging during their seven-day window, and the final image total appears in Debrief and the saved receipt.
-
-Run `godot --headless --path . --script res://tests/test_mission2.gd`. Mission 2 and all existing suites pass, and the release Web export succeeds. An isolated browser preview with random events disabled showed 456 images, four completed objectives, Debrief, and Mission 3 availability. Public hosting remains deferred.
-
-### Mission 3: Delta Flood Watch
-
-A passing reference build uses Electron, the SSTL-50 bus, Spectrolab solar array, ABS battery, NanoMind A3200, RW-0.03 wheels, HyperScout-2 and Syrlinks EWC30. The 14-day mission starts at orbit insertion; seven cloudy days leave seven clear observation days. SSO is represented by a planar orbit. Image attribution is in [CREDITS.md](CREDITS.md).
-
-Run the dedicated checks with `godot --headless --path . --script res://tests/test_mission3.gd`.
-
-### Mission 4: Geostationary Gateway
-
-The reference build uses Falcon 9, the heavy bus, Airbus array, EaglePicher battery, RAD750, R-4D-15 and Ku/Ka transponders, with 400 kg of propellant. Wait for apoapsis and burn prograde about 1,470 m/s; Skip becomes available once GEO is reached. An underperforming burn can be corrected with a second burn. The orbit model is planar and burns are instantaneous.
-
-Run `godot --headless --path . --script res://tests/test_mission4.gd` and `godot --headless --path . --script res://tests/test_day2_campaign.gd`. The fresh-campaign reference path has 96 SP before spending 82 SP on Mission 4 research. The full suite and a release Web export pass; a local browser preview verified the launch, apoapsis wait and GEO burn. Public deployment remains deferred.
-
-
-## Mission 5 — Cislunar Pathfinder
-
-Complete Mission 4 to unlock the Vega-C campaign launch. For a practice run, open **Archives → Cislunar Pathfinder → Start test flight**. The prebuilt spacecraft starts on the Earth launch pad. The test flight leaves campaign progress and rewards untouched.
-
-After 90 seconds in a 250 km parking orbit, the upper stage automatically injects toward the Moon. At the navigation update, a 47 m/s prograde correction predicts a 440 km flyby. Resume cruise to capture the lunar images, then follow the guided reentry and parachute descent to splashdown in the Pacific. A successful campaign run opens Tier 4 and unlocks Mission 7.
-
-Run `godot --headless --path . --script res://tests/test_lunar_flyby.gd` to check the campaign and Archives paths, trajectory correction, missed and impact cases, and deep-space power.
+See [CREDITS.md](CREDITS.md) for asset attribution.
